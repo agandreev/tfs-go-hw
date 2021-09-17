@@ -28,14 +28,8 @@ const (
 )
 
 func main() {
-	// set up default settings
-	color, _ := colorReset.getUTF()
-	symbolOptions := SymbolOptions(map[string]string{
-		"color":  color,
-		"symbol": "X",
-		"size":   "8"})
 	// run console client
-	runCommandLineClient(symbolOptions)
+	runCommandLineClient()
 }
 
 // Takes color number and returns it utf-8 value and error if it is impossible.
@@ -56,7 +50,14 @@ func (so SymbolOptions) String() string {
 
 // Main function, which apply all user's settings from updaters to sandglass settings.
 // Run printing function.
-func runUpdaters(symbolOptions SymbolOptions, updaters ...SymbolUpdater) {
+func runUpdaters(updaters ...SymbolUpdater) {
+	// set up default settings
+	color, _ := colorReset.getUTF()
+	symbolOptions := SymbolOptions(map[string]string{
+		"color":  color,
+		"symbol": "X",
+		"size":   "8"})
+
 	for _, updater := range updaters {
 		if err := updater(symbolOptions); err != nil {
 			fmt.Println(err)
@@ -147,7 +148,7 @@ func changeSize(stringSize string) SymbolUpdater {
 }
 
 // Runs command line client
-func runCommandLineClient(options SymbolOptions) {
+func runCommandLineClient() {
 	// sequence of setting functions (updaters)
 	var commandNumber int
 	commands := make([]SymbolUpdater, 0, 10)
@@ -159,22 +160,20 @@ func runCommandLineClient(options SymbolOptions) {
 			"1. Change size\n" +
 			"2. Change symbol\n" +
 			"3. Change color\n" +
-			"4. Show symbol options\n" +
-			"5. Run\n" +
-			"6. Exit")
+			"4. Run\n" +
+			"5. Exit")
 		_, err := fmt.Scanf("%d", &commandNumber)
-		if err != nil || commandNumber < 1 || commandNumber > 6 {
+		if err != nil || commandNumber < 1 || commandNumber > 5 {
 			fmt.Println("incorrect command number")
 			continue
 		}
 		// run command
-		switchCommandNumber(&commands, options, commandNumber)
+		switchCommandNumber(&commands, commandNumber)
 	}
 }
 
 // Runs command by it's number.
-func switchCommandNumber(commands *[]SymbolUpdater,
-	options SymbolOptions, commandNumber int) {
+func switchCommandNumber(commands *[]SymbolUpdater, commandNumber int) {
 	switch commandNumber {
 	case 1:
 		// append size updater
@@ -197,17 +196,10 @@ func switchCommandNumber(commands *[]SymbolUpdater,
 			"37\tcolorWhite")
 		*commands = append(*commands, changeColor(enterNewOption()))
 	case 4:
-		// output setting's info before running
-		fmt.Printf("Symbol options:\n"+
-			"Size: \t%s\n"+
-			"Symbol: \t%s\n"+
-			"New changes take effect after \"Run\"!\n\n",
-			options["size"], options.String())
-	case 5:
 		// execute main function and drop slice of updaters
-		runUpdaters(options, *commands...)
+		runUpdaters(*commands...)
 		*commands = make([]SymbolUpdater, 0, 10)
-	case 6:
+	case 5:
 		// exit
 		fmt.Println("Goodbye!")
 		os.Exit(0)
