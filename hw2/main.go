@@ -11,11 +11,13 @@ import (
 )
 
 const (
+	// env var name
 	envFile = "ENV FILE"
 	outFile = "out.json"
 )
 
 var (
+	// path to json file
 	filePath string
 )
 
