@@ -49,8 +49,8 @@ func (gb GrossBook) AddOperation(operation Operation) {
 	}
 }
 
-// SortStocks represent GrossBook as sorted balance slice for convenient processing.
-func (gb GrossBook) SortStocks() []*Balance {
+// SortedBalances represent GrossBook as sorted balance slice for convenient processing.
+func (gb GrossBook) SortedBalances() []*Balance {
 	// fill array by GrossBook values
 	operations := make([]*Balance, 0, len(gb))
 	for _, v := range gb {

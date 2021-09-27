@@ -88,31 +88,31 @@ func (operation *Operation) UnmarshalJSON(data []byte) error {
 	}
 
 	// operations with incorrect company, id or time will be skipped
-	updateOperation(operation, fields)
+	operation.updateOperation(fields)
 	return nil
 }
 
 // updateOperation enter fields (field by field) from dirtyJSON to Operation instance.
 // And updates Operation instance's status.
-func updateOperation(operation *Operation, fields DirtyJSON) {
+func (operation *Operation) updateOperation(fields DirtyJSON) {
 	var err error
-	if operation.Company, err = processCompanyTag(fields); err != nil {
+	if operation.Company, err = fields.Company(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Time, err = processTimeTag(fields); err != nil {
+	if operation.Time, err = fields.Time(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.ID, err = processIDTag(fields); err != nil {
+	if operation.ID, err = fields.ID(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Type, err = processTypeTag(fields); err != nil {
+	if operation.Type, err = fields.Type(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Value, err = processValueTag(fields); err != nil {
+	if operation.Value, err = fields.Value(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
@@ -131,13 +131,13 @@ func switchErrors(operation *Operation, err error) {
 	}
 }
 
-// processCompanyTag returns string implementation of company from DirtyJSON
-func processCompanyTag(fields DirtyJSON) (string, error) {
-	companyTag, ok := fields[companyField]
+// Company returns string implementation of company from DirtyJSON
+func (dj DirtyJSON) Company() (string, error) {
+	companyTag, ok := dj[companyField]
 	// check for tag existence
 	if !ok {
 		return emptyString, fmt.Errorf("%sjson hasn't company tag: %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 
 	// try to assert
@@ -145,22 +145,22 @@ func processCompanyTag(fields DirtyJSON) (string, error) {
 	case string:
 		if company == emptyString {
 			return emptyString, fmt.Errorf("%scompany tag content is empty: %w",
-				fields, ErrSkipOperation)
+				dj, ErrSkipOperation)
 		}
 		return company, nil
 	default:
 		return emptyString, fmt.Errorf("%scan't cast company tag content to string: %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 }
 
-// processTypeTag returns string implementation of type from DirtyJSON
-func processTypeTag(fields DirtyJSON) (string, error) {
-	typeTag, ok := fields[typeField]
+// Type returns string implementation of type from DirtyJSON
+func (dj DirtyJSON) Type() (string, error) {
+	typeTag, ok := dj[typeField]
 	// check for tag existence
 	if !ok {
 		return emptyString, fmt.Errorf("%sjson hasn't type tag: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	}
 
 	// try to assert
@@ -173,49 +173,49 @@ func processTypeTag(fields DirtyJSON) (string, error) {
 			}
 		}
 		return emptyString, fmt.Errorf("%stype tag content is illigal: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	default:
 		return emptyString, fmt.Errorf("%scan't cast type tag content to string: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	}
 }
 
-// processValueTag returns int64 implementation of value from DirtyJSON
-func processValueTag(fields DirtyJSON) (int64, error) {
-	valueTag, ok := fields[valueField]
+// Value returns int64 implementation of value from DirtyJSON
+func (dj DirtyJSON) Value() (int64, error) {
+	valueTag, ok := dj[valueField]
 	// check for tag existence
 	if !ok {
 		return 0, fmt.Errorf("%sjson hasn't value tag: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	}
 
 	// try to assert
 	switch value := valueTag.(type) {
 	case float64:
 		// separation of the int part
-		return separateFloat(fields, value, "value tag content has fractional: ")
+		return separateFloat(dj, value, "value tag content has fractional: ")
 	case string:
 		// parsing
 		floatValue, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			return 0, fmt.Errorf("%svalue tag content isn't a float: %w",
-				fields, ErrRejectOperation)
+				dj, ErrRejectOperation)
 		}
 		// separation of the int part
-		return separateFloat(fields, floatValue, "value tag content has fractional: ")
+		return separateFloat(dj, floatValue, "value tag content has fractional: ")
 	default:
 		return 0, fmt.Errorf("%svalue tag content isn't a digit: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	}
 }
 
-// processIDTag returns string implementation of id from DirtyJSON
-func processIDTag(fields DirtyJSON) (string, error) {
-	idTag, ok := fields[idField]
+// ID returns string implementation of id from DirtyJSON
+func (dj DirtyJSON) ID() (string, error) {
+	idTag, ok := dj[idField]
 	// check for tag existence
 	if !ok {
 		return emptyString, fmt.Errorf("%sjson hasn't id tag: %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 
 	// try to assert
@@ -227,25 +227,25 @@ func processIDTag(fields DirtyJSON) (string, error) {
 			return fmt.Sprintf("%d", int64(intPart)), nil
 		}
 		return "", fmt.Errorf("%sid tag content has fractional: %w",
-			fields, ErrRejectOperation)
+			dj, ErrRejectOperation)
 	case string:
 		if id == emptyString {
 			return emptyString, fmt.Errorf("%stime tag is empty: %w",
-				fields, ErrSkipOperation)
+				dj, ErrSkipOperation)
 		}
 		return id, nil
 	default:
 		return emptyString, fmt.Errorf("%scan't cast id tag to string %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 }
 
-// processTimeTag returns time.Time implementation of created_at from DirtyJSON
-func processTimeTag(fields DirtyJSON) (time.Time, error) {
-	timeTag, ok := fields[timeField]
+// Time returns time.Time implementation of created_at from DirtyJSON
+func (dj DirtyJSON) Time() (time.Time, error) {
+	timeTag, ok := dj[timeField]
 	if !ok {
 		return time.Now(), fmt.Errorf("%sjson hasn't time tag: %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 
 	// try to assert
@@ -254,12 +254,12 @@ func processTimeTag(fields DirtyJSON) (time.Time, error) {
 		timeLayouted, err := time.Parse(time.RFC3339, timeValue)
 		if err != nil {
 			return time.Now(), fmt.Errorf("%stime tag content is broken format: %w",
-				fields, ErrSkipOperation)
+				dj, ErrSkipOperation)
 		}
 		return timeLayouted, nil
 	default:
 		return time.Now(), fmt.Errorf("%scan't cast time tag content to string: %w",
-			fields, ErrSkipOperation)
+			dj, ErrSkipOperation)
 	}
 }
 
