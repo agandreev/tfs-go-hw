@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 )
@@ -59,6 +60,10 @@ func runBalanceCounter() error {
 	if err != nil {
 		return err
 	}
+	// sort operations for convenient processing and representations
+	sort.SliceStable(operations, func(i, j int) bool {
+		return operations[i].ID < operations[j].ID
+	})
 
 	// add operations to gross book
 	gb := accountant.GrossBook{}
@@ -67,7 +72,7 @@ func runBalanceCounter() error {
 	}
 
 	// marshal balances from gross book
-	data, err = json.MarshalIndent(gb.SortStocks(), "", "\t")
+	data, err = json.MarshalIndent(gb.SortedBalances(), "", "\t")
 	if err != nil {
 		return err
 	}

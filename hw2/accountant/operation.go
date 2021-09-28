@@ -24,6 +24,8 @@ const (
 	timeField      = "created_at"
 	operationField = "operation"
 
+	income      = "income"
+	outcome     = "outcome"
 	emptyString = ""
 	// if you want to see operation processing
 	printErrors = true
@@ -31,7 +33,10 @@ const (
 
 var (
 	// available Operation types (can be expanded)
-	typeValues = [...]string{"income", "outcome", "+", "-"}
+	typeValues = map[string][]string{
+		income:  {"income", "Income", "+"},
+		outcome: {"outcome", "Outcome", "-"},
+	}
 
 	// ErrSkipOperation describes violation behavior for operations to be skipped
 	ErrSkipOperation = errors.New("this operation should be skipped")
@@ -116,6 +121,7 @@ func (operation *Operation) updateOperation(fields DirtyJSON) {
 		switchErrors(operation, err)
 		return
 	}
+	operation.harmonizeValueWithType()
 }
 
 // switchErrors update Operation instance's status by given error.
@@ -166,10 +172,16 @@ func (dj DirtyJSON) Type() (string, error) {
 	// try to assert
 	switch typeSwitcher := typeTag.(type) {
 	case string:
-		// check for income, outcome, +, -
-		for _, typeValue := range typeValues {
+		// check for outcome value
+		for _, typeValue := range typeValues[outcome] {
 			if typeValue == typeSwitcher {
-				return typeSwitcher, nil
+				return outcome, nil
+			}
+		}
+		// check for income value
+		for _, typeValue := range typeValues[income] {
+			if typeValue == typeSwitcher {
+				return income, nil
 			}
 		}
 		return emptyString, fmt.Errorf("%stype tag content is illigal: %w",
@@ -280,4 +292,13 @@ func separateFloat(fields DirtyJSON, fl float64, errorText string) (int64, error
 	}
 	return 0, fmt.Errorf("%s%s: %w",
 		fields, errorText, ErrRejectOperation)
+}
+
+// harmonizeValueWithType correlates the operation type with the value sign
+func (operation *Operation) harmonizeValueWithType() {
+	// todo: add overflow checking
+	if (operation.Type == income && operation.Value < 0) ||
+		(operation.Type == outcome && operation.Value > 0) {
+		operation.Value *= -1
+	}
 }
