@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 	"io"
 	"io/ioutil"
 	"os"
 	"sort"
+
+	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 )
 
 const (
@@ -53,7 +54,6 @@ func runBalanceCounter() error {
 	if err != nil {
 		return err
 	}
-
 
 	// unmarshalling
 	var operations []accountant.Operation
@@ -148,11 +148,11 @@ func loadInput() ArgsReader {
 	return func() {
 		filePath = "billing.json"
 		f, err := os.Create(filePath)
-		defer f.Close()
 		if err != nil {
 			fmt.Println("problems with file creating")
 			return
 		}
+		defer f.Close()
 
 		// reading
 		buf, err := ioutil.ReadAll(os.Stdin)
