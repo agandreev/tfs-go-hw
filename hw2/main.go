@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 	"io"
+	"io/ioutil"
 	"os"
 	"sort"
-
-	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 )
 
 const (
@@ -53,6 +53,7 @@ func runBalanceCounter() error {
 	if err != nil {
 		return err
 	}
+
 
 	// unmarshalling
 	var operations []accountant.Operation
@@ -145,15 +146,24 @@ func loadEnv() ArgsReader {
 // loadInput returns ArgsReader function, which reads user's input
 func loadInput() ArgsReader {
 	return func() {
-		// infinite loop makes user to enter non-empty string
-		for {
-			fmt.Println("Enter path to json file:")
-			_, err := fmt.Scanf("%s", &filePath)
-			if err != nil || len(filePath) == 0 {
-				fmt.Println("Incorrect string entered...")
-				continue
-			}
-			break
+		filePath = "billing.json"
+		f, err := os.Create(filePath)
+		defer f.Close()
+		if err != nil {
+			fmt.Println("problems with file creating")
+			return
+		}
+
+		// reading
+		buf, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Println("problems with STDIN reading")
+			return
+		}
+		_, err = f.Write(buf)
+		if err != nil {
+			fmt.Println("problems with file writing")
+			return
 		}
 	}
 }
