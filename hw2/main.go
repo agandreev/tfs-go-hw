@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 
 	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 )
@@ -54,11 +55,12 @@ func runBalanceCounter() error {
 	}
 
 	// unmarshalling
-	var operations []accountant.Operation
+	var operations accountant.Operations
 	err = json.Unmarshal(data, &operations)
 	if err != nil {
 		return err
 	}
+	sort.Sort(operations)
 
 	// add operations to gross book
 	gb := accountant.GrossBook{}

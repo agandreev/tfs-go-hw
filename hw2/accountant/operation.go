@@ -298,3 +298,22 @@ func (operation *Operation) harmonizeValueWithType() {
 		operation.Value *= -1
 	}
 }
+
+type Operations []Operation
+
+// Len is the number of elements in the collection.
+func (operations Operations) Len() int { return len(operations) }
+
+// Less reports whether the element with
+// index i should sort before the element with index j.
+func (operations Operations) Less(i, j int) bool {
+	if operations[i].Status == skip {
+		return false
+	}
+	return operations[i].Time < operations[j].Time
+}
+
+// Swap swaps the elements with indexes i and j.
+func (operations Operations) Swap(i, j int) {
+	operations[i], operations[j] = operations[j], operations[i]
+}
