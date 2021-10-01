@@ -1,15 +1,29 @@
 package accountant
 
 import (
+	"fmt"
 	"sort"
-	"strconv"
 )
 
 // GrossBook represents map of string keys (company name) and Balance values.
 type GrossBook map[string]*Balance
 
-// InvalidOperationsSlice describes dynamic slice and realize custom Marshall
+// InvalidOperationsSlice describes dynamic slice of invalid operation's ids
 type InvalidOperationsSlice []interface{}
+
+// Len is the number of elements in the collection.
+func (operations InvalidOperationsSlice) Len() int { return len(operations) }
+
+// Less reports whether the element with
+// index i should sort before the element with index j.
+func (operations InvalidOperationsSlice) Less(i, j int) bool {
+	return castIDToString(operations[i]) < castIDToString(operations[j])
+}
+
+// Swap swaps the elements with indexes i and j.
+func (operations InvalidOperationsSlice) Swap(i, j int) {
+	operations[i], operations[j] = operations[j], operations[i]
+}
 
 // Balance represents final balance for specific company.
 type Balance struct {
@@ -39,7 +53,7 @@ func (gb GrossBook) AddOperation(operation Operation) {
 	stock := gb[operation.Company]
 	// if operation should be rejected
 	if operation.Status == invalid {
-		stock.addInvalidOperation(operation.ID)
+		stock.InvalidOperations = append(stock.InvalidOperations, operation.ID)
 		return
 	}
 	// common way
@@ -49,11 +63,12 @@ func (gb GrossBook) AddOperation(operation Operation) {
 	}
 }
 
-// SortedBalances represent GrossBook as sorted balance slice for convenient processing.
+// SortedBalances represent GrossBook as sorted Balance slice for convenient processing.
 func (gb GrossBook) SortedBalances() []*Balance {
 	// fill array by GrossBook values
 	operations := make([]*Balance, 0, len(gb))
 	for _, v := range gb {
+		sort.Sort(v.InvalidOperations)
 		operations = append(operations, v)
 	}
 	// sorting
@@ -63,12 +78,13 @@ func (gb GrossBook) SortedBalances() []*Balance {
 	return operations
 }
 
-// addInvalidOperation is taken out to process string id in int and string ways.
-func (balance *Balance) addInvalidOperation(id string) {
-	intID, err := strconv.Atoi(id)
-	if err != nil {
-		balance.InvalidOperations = append(balance.InvalidOperations, id)
-	} else {
-		balance.InvalidOperations = append(balance.InvalidOperations, intID)
+func castIDToString(id interface{}) string {
+	switch idSwitcher := id.(type) {
+	case int64:
+		return fmt.Sprintf("%d", idSwitcher)
+	case string:
+		return idSwitcher
 	}
+	fmt.Println(id)
+	panic("unexpected value in castIDToString function")
 }

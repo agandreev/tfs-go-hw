@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -16,17 +15,10 @@ const (
 	invalid
 	skip
 
-	// describes JSON's fields
-	companyField   = "company"
-	typeField      = "type"
-	valueField     = "value"
-	idField        = "id"
-	timeField      = "created_at"
-	operationField = "operation"
-
 	income      = "income"
 	outcome     = "outcome"
 	emptyString = ""
+
 	// if you want to see operation processing
 	printErrors = true
 )
@@ -47,18 +39,33 @@ var (
 // OperationStatus describes will operation be skipped, rejected or passed
 type OperationStatus int
 
-// DirtyJSON describes unmarshalled JSON into map of string key (field name)
-// and empty interface as value of the field
-type DirtyJSON map[string]interface{}
+// DirtyJSON describes unmarshalled JSON into struct with empty interfaces
+// as value of the fields
+type DirtyJSON struct {
+	InnerOperation  InnerOperations `json:"operation"`
+	CompanyTag      string          `json:"company"`
+	TypeTag         string          `json:"type"`
+	ValueTag        interface{}     `json:"value"`
+	IDTag           interface{}     `json:"id"`
+	CreationTimeTag time.Time       `json:"created_at"`
+}
 
-// Operation describes structure of entire JSON and it's status of condition
+// InnerOperations describes inner JSON field
+type InnerOperations struct {
+	TypeTag         string      `json:"type"`
+	ValueTag        interface{} `json:"value"`
+	IDTag           interface{} `json:"id"`
+	CreationTimeTag time.Time   `json:"created_at"`
+}
+
+// Operation describes structure of entire JSON, and it's status of condition
 // (valid, invalid, rejected)
 type Operation struct {
 	Company string
 	Type    string
 	Value   int64
-	ID      string
-	Time    time.Time
+	ID      interface{}
+	Time    string
 	Status  OperationStatus
 }
 
@@ -77,19 +84,7 @@ func (operation *Operation) UnmarshalJSON(data []byte) error {
 	// unmarshall json to map
 	var fields DirtyJSON
 	if err := json.Unmarshal(data, &fields); err != nil {
-		return err
-	}
-
-	// check received map for nestedMaps and concat fields
-	if nestedMap, ok := fields[operationField]; ok {
-		for field, value := range nestedMap.(map[string]interface{}) {
-			// check for duplicated fields from nested map
-			if _, ok := fields[field]; ok {
-				return fmt.Errorf("%sthe same fields in one structure", fields)
-			}
-			fields[field] = value
-		}
-		delete(fields, operationField)
+		operation.Status = skip
 	}
 
 	// operations with incorrect company, id or time will be skipped
@@ -139,66 +134,57 @@ func switchErrors(operation *Operation, err error) {
 
 // Company returns string implementation of company from DirtyJSON
 func (dj DirtyJSON) Company() (string, error) {
-	companyTag, ok := dj[companyField]
-	// check for tag existence
-	if !ok {
-		return emptyString, fmt.Errorf("%sjson hasn't company tag: %w",
+	if dj.CompanyTag == emptyString {
+		return emptyString, fmt.Errorf("%scompany tag content is empty: %w",
 			dj, ErrSkipOperation)
 	}
-
-	// try to assert
-	switch company := companyTag.(type) {
-	case string:
-		if company == emptyString {
-			return emptyString, fmt.Errorf("%scompany tag content is empty: %w",
-				dj, ErrSkipOperation)
-		}
-		return company, nil
-	default:
-		return emptyString, fmt.Errorf("%scan't cast company tag content to string: %w",
-			dj, ErrSkipOperation)
-	}
+	return dj.CompanyTag, nil
 }
 
 // Type returns string implementation of type from DirtyJSON
 func (dj DirtyJSON) Type() (string, error) {
-	typeTag, ok := dj[typeField]
-	// check for tag existence
-	if !ok {
+	var typeTag string
+	// check if json is broken
+	if dj.TypeTag == emptyString && dj.InnerOperation.TypeTag == emptyString {
 		return emptyString, fmt.Errorf("%sjson hasn't type tag: %w",
-			dj, ErrRejectOperation)
+			dj, ErrSkipOperation)
+	}
+	// pick not null value
+	if dj.TypeTag != emptyString {
+		typeTag = dj.TypeTag
+	} else {
+		typeTag = dj.InnerOperation.TypeTag
 	}
 
-	// try to assert
-	switch typeSwitcher := typeTag.(type) {
-	case string:
-		// check for outcome value
-		for _, typeValue := range typeValues[outcome] {
-			if typeValue == typeSwitcher {
-				return outcome, nil
-			}
+	// check for outcome value
+	for _, typeValue := range typeValues[outcome] {
+		if typeValue == typeTag {
+			return outcome, nil
 		}
-		// check for income value
-		for _, typeValue := range typeValues[income] {
-			if typeValue == typeSwitcher {
-				return income, nil
-			}
-		}
-		return emptyString, fmt.Errorf("%stype tag content is illigal: %w",
-			dj, ErrRejectOperation)
-	default:
-		return emptyString, fmt.Errorf("%scan't cast type tag content to string: %w",
-			dj, ErrRejectOperation)
 	}
+	// check for income value
+	for _, typeValue := range typeValues[income] {
+		if typeValue == typeTag {
+			return income, nil
+		}
+	}
+	return emptyString, fmt.Errorf("%stype tag content is illigal: %w",
+		dj, ErrRejectOperation)
 }
 
 // Value returns int64 implementation of value from DirtyJSON
 func (dj DirtyJSON) Value() (int64, error) {
-	valueTag, ok := dj[valueField]
-	// check for tag existence
-	if !ok {
+	var valueTag interface{}
+	// check if json is broken
+	if dj.ValueTag == nil && dj.InnerOperation.ValueTag == nil {
 		return 0, fmt.Errorf("%sjson hasn't value tag: %w",
 			dj, ErrRejectOperation)
+	}
+	// pick not null value
+	if dj.ValueTag != nil {
+		valueTag = dj.ValueTag
+	} else {
+		valueTag = dj.InnerOperation.ValueTag
 	}
 
 	// try to assert
@@ -222,12 +208,18 @@ func (dj DirtyJSON) Value() (int64, error) {
 }
 
 // ID returns string implementation of id from DirtyJSON
-func (dj DirtyJSON) ID() (string, error) {
-	idTag, ok := dj[idField]
-	// check for tag existence
-	if !ok {
+func (dj DirtyJSON) ID() (interface{}, error) {
+	var idTag interface{}
+	// check if json is broken
+	if dj.IDTag == nil && dj.InnerOperation.IDTag == nil {
 		return emptyString, fmt.Errorf("%sjson hasn't id tag: %w",
 			dj, ErrSkipOperation)
+	}
+	// pick not null value
+	if dj.IDTag != nil {
+		idTag = dj.IDTag
+	} else {
+		idTag = dj.InnerOperation.IDTag
 	}
 
 	// try to assert
@@ -236,7 +228,7 @@ func (dj DirtyJSON) ID() (string, error) {
 		// separation of int part
 		intPart, frac := math.Modf(id)
 		if frac == 0 {
-			return fmt.Sprintf("%d", int64(intPart)), nil
+			return int64(intPart), nil
 		}
 		return "", fmt.Errorf("%sid tag content has fractional: %w",
 			dj, ErrRejectOperation)
@@ -253,35 +245,39 @@ func (dj DirtyJSON) ID() (string, error) {
 }
 
 // Time returns time.Time implementation of created_at from DirtyJSON
-func (dj DirtyJSON) Time() (time.Time, error) {
-	timeTag, ok := dj[timeField]
-	if !ok {
-		return time.Now(), fmt.Errorf("%sjson hasn't time tag: %w",
-			dj, ErrSkipOperation)
+func (dj DirtyJSON) Time() (string, error) {
+	// check if both time values are empty
+	if dj.InnerOperation.CreationTimeTag.IsZero() &&
+		dj.CreationTimeTag.IsZero() {
+		return time.Now().Format(time.RFC3339),
+			fmt.Errorf("%sjson hasn't time tag: %w", dj, ErrSkipOperation)
 	}
-
-	// try to assert
-	switch timeValue := timeTag.(type) {
-	case string:
-		timeLayouted, err := time.Parse(time.RFC3339, timeValue)
-		if err != nil {
-			return time.Now(), fmt.Errorf("%stime tag content is broken format: %w",
-				dj, ErrSkipOperation)
-		}
-		return timeLayouted, nil
-	default:
-		return time.Now(), fmt.Errorf("%scan't cast time tag content to string: %w",
-			dj, ErrSkipOperation)
+	// check if inner json time is empty
+	if dj.CreationTimeTag.IsZero() {
+		return dj.InnerOperation.CreationTimeTag.Format(time.RFC3339), nil
 	}
+	return dj.CreationTimeTag.Format(time.RFC3339), nil
 }
 
 // String represents DirtyJSON as string through string builder.
 func (dj DirtyJSON) String() string {
-	sb := strings.Builder{}
-	for k, v := range dj {
-		sb.WriteString(fmt.Sprintf("%s\t%s\n", k, v))
-	}
-	return sb.String()
+	return fmt.Sprintf("Company: %s\n"+
+		"Type: %s\n"+
+		"Value: %v\n"+
+		"ID: %v\n"+
+		"Time: %s\n%s",
+		dj.CompanyTag, dj.TypeTag, dj.ValueTag, dj.IDTag,
+		dj.CreationTimeTag, dj.InnerOperation)
+}
+
+// String represents DirtyJSON as string through string builder.
+func (inner InnerOperations) String() string {
+	return fmt.Sprintf("Operation:\n"+
+		"\tType: %v\n"+
+		"\tValue: %v\n"+
+		"\tID: %v\n"+
+		"\tTime: %s\n",
+		inner.TypeTag, inner.ValueTag, inner.IDTag, inner.CreationTimeTag)
 }
 
 // separateFloat separate float to int part and check fractional for zero-value

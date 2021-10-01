@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"sort"
 
 	"github.com/agandreev/tfs-go-hw/hw2/accountant"
 )
@@ -61,10 +60,6 @@ func runBalanceCounter() error {
 	if err != nil {
 		return err
 	}
-	// sort operations for convenient processing and representations
-	sort.SliceStable(operations, func(i, j int) bool {
-		return operations[i].ID < operations[j].ID
-	})
 
 	// add operations to gross book
 	gb := accountant.GrossBook{}
