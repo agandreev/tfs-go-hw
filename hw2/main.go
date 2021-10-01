@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/agandreev/tfs-go-hw/hw2/accountant"
@@ -30,11 +29,11 @@ func init() {
 	// uncomment for convenient way to add env var
 	// os.Setenv(envFile, "env file path")
 	// slice of sources could be expanded
-	argsReaders := []ArgsReader{loadFlags(), loadEnv(), loadInput()}
+	argsReaders := []ArgsReader{loadFlags(), loadEnv()}
 	for _, argsReader := range argsReaders {
 		argsReader()
 		if filePath != "" {
-			break
+			return
 		}
 	}
 }
@@ -49,7 +48,7 @@ func main() {
 // runBalanceCounter runs app logic step by step
 func runBalanceCounter() error {
 	// check file and read if it's possible
-	data, err := processFileReading()
+	data, err := processDataReading()
 	if err != nil {
 		return err
 	}
@@ -81,8 +80,16 @@ func runBalanceCounter() error {
 	return nil
 }
 
-// processFileReading check existence of file (not directory) by path
-func processFileReading() ([]byte, error) {
+// processDataReading check existence of file (not directory) by path
+func processDataReading() ([]byte, error) {
+	if filePath != "" {
+		return readFile()
+	}
+	return readInput()
+}
+
+// readFile reads file
+func readFile() ([]byte, error) {
 	// file opening
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -103,6 +110,16 @@ func processFileReading() ([]byte, error) {
 	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, fmt.Errorf("problems in file reading: %w", err)
+	}
+	return data, nil
+}
+
+// readInput reads stdin
+func readInput() ([]byte, error) {
+	// reading
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("problems in stdin reading: %w", err)
 	}
 	return data, nil
 }
@@ -135,30 +152,5 @@ func loadFlags() ArgsReader {
 func loadEnv() ArgsReader {
 	return func() {
 		filePath = os.Getenv(envFile)
-	}
-}
-
-// loadInput returns ArgsReader function, which reads user's input
-func loadInput() ArgsReader {
-	return func() {
-		filePath = "billing.json"
-		f, err := os.Create(filePath)
-		if err != nil {
-			fmt.Println("problems with file creating")
-			return
-		}
-		defer f.Close()
-
-		// reading
-		buf, err := ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			fmt.Println("problems with STDIN reading")
-			return
-		}
-		_, err = f.Write(buf)
-		if err != nil {
-			fmt.Println("problems with file writing")
-			return
-		}
 	}
 }
