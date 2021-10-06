@@ -95,7 +95,7 @@ type CandleGenerator struct {
 	// Candles is map of Ticker candles
 	Candles map[string]*Candle
 	// logger
-	logger *logrus.Logger
+	Logger *logrus.Logger
 }
 
 // AddPrice convert Price to single price Candle and run AddCandle
@@ -107,7 +107,7 @@ func (generator *CandleGenerator) AddPrice(candles chan<- Candle, price Price) e
 // AddCandle add new candle to generator if timestamp allow
 // else generator creates new candle and sends old to channel
 func (generator *CandleGenerator) AddCandle(candles chan<- Candle, candle Candle) error {
-	// update timeStamp
+	// update timeStamp by generators period
 	if err := candle.updateTS(generator.Period); err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (generator *CandleGenerator) AddCandle(candles chan<- Candle, candle Candle
 	// outdated TS case
 	if errors.Is(ErrUnclosedCandle, err) {
 		candles <- *generator.Candles[candle.Ticker]
-		// generator.logger.Println(generator.Candles[candle.Ticker])
+		generator.Logger.Println(generator.Candles[candle.Ticker])
 		delete(generator.Candles, candle.Ticker)
 		return generator.AddCandle(candles, candle)
 	}
@@ -134,7 +134,7 @@ func (generator *CandleGenerator) AddCandle(candles chan<- Candle, candle Candle
 func (generator CandleGenerator) RemainCandles(candles chan<- Candle) {
 	for _, candle := range generator.Candles {
 		if candle != nil {
-			//generator.logger.Println(*candle)
+			generator.Logger.Println(*candle)
 			candles <- *candle
 		}
 	}
@@ -178,7 +178,6 @@ func (candle Candle) Save() error {
 	}
 	defer file.Close()
 	_, err = file.WriteString(candle.String() + "\n")
-	// fmt.Println(candle)
 	if err != nil {
 		return err
 	}

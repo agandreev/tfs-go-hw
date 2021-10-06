@@ -21,6 +21,28 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	g, ctx := errgroup.WithContext(ctx)
 
+	runPipeline(ctx, g, logger)
+
+	// signals checking
+	go func() {
+		term := make(chan os.Signal, 1)
+		signal.Notify(term, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+
+		<-term
+		log.Println("Interruption signal was caught")
+		cancel()
+	}()
+
+	// pipeline finish checking
+	if err := g.Wait(); err == nil || err == context.Canceled {
+		log.Println("finished gracefully by interruption")
+	} else {
+		log.Printf("received error: %v", err)
+	}
+}
+
+// runPipeline runs all Pipeline's steps
+func runPipeline(ctx context.Context, g *errgroup.Group, logger *log.Logger) {
 	pg := generator.NewPricesGenerator(generator.Config{
 		Factor:  10,
 		Delay:   time.Millisecond * 500,
@@ -42,20 +64,4 @@ func main() {
 		g, secondCandles, allCandles, domain.CandlePeriod10m)
 	// saving
 	pipe.SaveAllCandles(g, thirdCandles, allCandles)
-
-	// signals checking
-	go func() {
-		term := make(chan os.Signal, 1)
-		signal.Notify(term, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-
-		<-term
-		cancel()
-	}()
-
-	// pipeline finish checking
-	if err := g.Wait(); err == nil || err == context.Canceled {
-		log.Println("finished gracefully by interruption")
-	} else {
-		log.Printf("received error: %v", err)
-	}
 }

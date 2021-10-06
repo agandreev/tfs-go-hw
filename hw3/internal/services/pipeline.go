@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Pipeline represents Candle Pipeline steps with loging.
 type Pipeline struct {
 	Logger *logrus.Logger
 }
@@ -26,7 +27,8 @@ func (pipe Pipeline) CandlesFromPrices(g *errgroup.Group, prices <-chan domain.P
 		defer close(candles)
 
 		gen := domain.CandleGenerator{Period: period,
-			Candles: map[string]*domain.Candle{}}
+			Candles: map[string]*domain.Candle{},
+			Logger:  pipe.Logger}
 		for price := range prices {
 			// error stops pipeline
 			if err := gen.AddPrice(candles, price); err != nil {
@@ -54,7 +56,8 @@ func (pipe Pipeline) CandlesFromCandles(g *errgroup.Group, candles1m <-chan doma
 		defer close(candles)
 
 		gen := domain.CandleGenerator{Period: period,
-			Candles: map[string]*domain.Candle{}}
+			Candles: map[string]*domain.Candle{},
+			Logger:  pipe.Logger}
 		for candle := range candles1m {
 			allCandles <- candle
 			if err := gen.AddCandle(candles, candle); err != nil {
