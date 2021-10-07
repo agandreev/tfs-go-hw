@@ -1,6 +1,7 @@
 package accountant
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -43,8 +44,15 @@ func (gb GrossBook) AddOperation(operation Operation) {
 	}
 	// common way
 	if operation.Status == valid {
+		switch operation.Type {
+		case income:
+			stock.Balance += operation.Value
+		case outcome:
+			stock.Balance -= operation.Value
+		default:
+			panic(fmt.Sprintf("unknown operation type %s", operation.Type))
+		}
 		stock.ValidOperationsCount++
-		stock.Balance += operation.Value
 	}
 }
 

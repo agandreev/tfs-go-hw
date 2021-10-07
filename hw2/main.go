@@ -17,33 +17,30 @@ const (
 	outFile = "out.json"
 )
 
-var (
-	// path to json file
-	filePath string
-)
-
 // ArgsReader describes function, which reads arguments from individual source
-type ArgsReader func()
-
-// init processes reading argument from different sources by priority
-func init() {
-	// uncomment for convenient way to add env var
-	// os.Setenv(envFile, "env file path")
-	// slice of sources could be expanded
-	argsReaders := []ArgsReader{loadFlags(), loadEnv()}
-	for _, argsReader := range argsReaders {
-		argsReader()
-		if filePath != "" {
-			return
-		}
-	}
-}
+type ArgsReader func() string
 
 func main() {
 	if err := runBalanceCounter(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// readPath processes reading path-argument from different sources by priority
+func readPath() string {
+	var filePath string
+	// uncomment for convenient way to add env var
+	// os.Setenv(envFile, "env file path")
+	// slice of sources could be expanded
+	argsReaders := []ArgsReader{loadFlags(), loadEnv()}
+	for _, argsReader := range argsReaders {
+		filePath = argsReader()
+		if filePath != "" {
+			return filePath
+		}
+	}
+	return filePath
 }
 
 // runBalanceCounter runs app logic step by step
@@ -84,14 +81,14 @@ func runBalanceCounter() error {
 
 // processDataReading check existence of file (not directory) by path
 func processDataReading() ([]byte, error) {
-	if filePath != "" {
-		return readFile()
+	if filePath := readPath(); filePath != "" {
+		return readFile(filePath)
 	}
 	return readInput()
 }
 
 // readFile reads file
-func readFile() ([]byte, error) {
+func readFile(filePath string) ([]byte, error) {
 	// file opening
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -143,16 +140,19 @@ func processFileWriting(data []byte) error {
 // loadEnv returns ArgsReader function,
 // which reads command line arg "--file"
 func loadFlags() ArgsReader {
-	return func() {
+	return func() string {
+		var filePath string
 		flag.StringVar(&filePath, "file", "", "path to json")
 		flag.Parse()
+		return filePath
 	}
 }
 
 // loadEnv returns ArgsReader function,
 // which reads const environment variable envFile
 func loadEnv() ArgsReader {
-	return func() {
-		filePath = os.Getenv(envFile)
+	return func() string {
+		filePath := os.Getenv(envFile)
+		return filePath
 	}
 }

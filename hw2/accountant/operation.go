@@ -39,23 +39,20 @@ var (
 // OperationStatus describes will operation be skipped, rejected or passed
 type OperationStatus int
 
-// DirtyJSON describes unmarshalled JSON into struct with empty interfaces
+// EmbeddedJSON describes unmarshalled JSON into struct with empty interfaces
 // as value of the fields
-type DirtyJSON struct {
-	InnerOperation  InnerOperations `json:"operation"`
-	CompanyTag      string          `json:"company"`
-	TypeTag         string          `json:"type"`
-	ValueTag        interface{}     `json:"value"`
-	IDTag           interface{}     `json:"id"`
-	CreationTimeTag time.Time       `json:"created_at"`
+type EmbeddedJSON struct {
+	Company   string    `json:"company"`
+	Operation InnerJSON `json:"operation"`
+	InnerJSON
 }
 
-// InnerOperations describes inner JSON field
-type InnerOperations struct {
-	TypeTag         string      `json:"type"`
-	ValueTag        interface{} `json:"value"`
-	IDTag           interface{} `json:"id"`
-	CreationTimeTag time.Time   `json:"created_at"`
+// InnerJSON describes inner JSON field
+type InnerJSON struct {
+	Type         string      `json:"type"`
+	Value        interface{} `json:"value"`
+	ID           interface{} `json:"id"`
+	CreationTime time.Time   `json:"created_at"`
 }
 
 // Operation describes structure of entire JSON, and it's status of condition
@@ -82,7 +79,7 @@ func (operation Operation) String() string {
 // UnmarshalJSON implements Unmarshaler interface and represents custom Unmarshal.
 func (operation *Operation) UnmarshalJSON(data []byte) error {
 	// unmarshall json to map
-	var fields DirtyJSON
+	var fields EmbeddedJSON
 	if err := json.Unmarshal(data, &fields); err != nil {
 		operation.Status = skip
 	}
@@ -94,29 +91,28 @@ func (operation *Operation) UnmarshalJSON(data []byte) error {
 
 // updateOperation enter fields (field by field) from dirtyJSON to Operation instance.
 // And updates Operation instance's status.
-func (operation *Operation) updateOperation(fields DirtyJSON) {
+func (operation *Operation) updateOperation(fields EmbeddedJSON) {
 	var err error
-	if operation.Company, err = fields.Company(); err != nil {
+	if operation.Company, err = fields.CompanyProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Time, err = fields.Time(); err != nil {
+	if operation.Time, err = fields.TimeProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.ID, err = fields.ID(); err != nil {
+	if operation.ID, err = fields.IDProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Type, err = fields.Type(); err != nil {
+	if operation.Type, err = fields.TypeProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Value, err = fields.Value(); err != nil {
+	if operation.Value, err = fields.ValueProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	operation.harmonizeValueWithType()
 }
 
 // switchErrors update Operation instance's status by given error.
@@ -132,28 +128,28 @@ func switchErrors(operation *Operation, err error) {
 	}
 }
 
-// Company returns string implementation of company from DirtyJSON
-func (dj DirtyJSON) Company() (string, error) {
-	if dj.CompanyTag == emptyString {
+// CompanyProcessed returns string implementation of company from EmbeddedJSON
+func (dj EmbeddedJSON) CompanyProcessed() (string, error) {
+	if dj.Company == emptyString {
 		return emptyString, fmt.Errorf("%scompany tag content is empty: %w",
 			dj, ErrSkipOperation)
 	}
-	return dj.CompanyTag, nil
+	return dj.Company, nil
 }
 
-// Type returns string implementation of type from DirtyJSON
-func (dj DirtyJSON) Type() (string, error) {
+// TypeProcessed returns string implementation of type from EmbeddedJSON
+func (dj EmbeddedJSON) TypeProcessed() (string, error) {
 	var typeTag string
 	// check if json is broken
-	if dj.TypeTag == emptyString && dj.InnerOperation.TypeTag == emptyString {
+	if dj.Type == emptyString && dj.Operation.Type == emptyString {
 		return emptyString, fmt.Errorf("%sjson hasn't type tag: %w",
 			dj, ErrSkipOperation)
 	}
 	// pick not null value
-	if dj.TypeTag != emptyString {
-		typeTag = dj.TypeTag
+	if dj.Type != emptyString {
+		typeTag = dj.Type
 	} else {
-		typeTag = dj.InnerOperation.TypeTag
+		typeTag = dj.Operation.Type
 	}
 
 	// check for outcome value
@@ -172,19 +168,19 @@ func (dj DirtyJSON) Type() (string, error) {
 		dj, ErrRejectOperation)
 }
 
-// Value returns int64 implementation of value from DirtyJSON
-func (dj DirtyJSON) Value() (int64, error) {
+// ValueProcessed returns int64 implementation of value from EmbeddedJSON
+func (dj EmbeddedJSON) ValueProcessed() (int64, error) {
 	var valueTag interface{}
 	// check if json is broken
-	if dj.ValueTag == nil && dj.InnerOperation.ValueTag == nil {
+	if dj.Value == nil && dj.Operation.Value == nil {
 		return 0, fmt.Errorf("%sjson hasn't value tag: %w",
 			dj, ErrRejectOperation)
 	}
 	// pick not null value
-	if dj.ValueTag != nil {
-		valueTag = dj.ValueTag
+	if dj.Value != nil {
+		valueTag = dj.Value
 	} else {
-		valueTag = dj.InnerOperation.ValueTag
+		valueTag = dj.Operation.Value
 	}
 
 	// try to assert
@@ -207,19 +203,19 @@ func (dj DirtyJSON) Value() (int64, error) {
 	}
 }
 
-// ID returns string implementation of id from DirtyJSON
-func (dj DirtyJSON) ID() (interface{}, error) {
+// IDProcessed returns string implementation of id from EmbeddedJSON
+func (dj EmbeddedJSON) IDProcessed() (interface{}, error) {
 	var idTag interface{}
 	// check if json is broken
-	if dj.IDTag == nil && dj.InnerOperation.IDTag == nil {
+	if dj.ID == nil && dj.Operation.ID == nil {
 		return emptyString, fmt.Errorf("%sjson hasn't id tag: %w",
 			dj, ErrSkipOperation)
 	}
 	// pick not null value
-	if dj.IDTag != nil {
-		idTag = dj.IDTag
+	if dj.ID != nil {
+		idTag = dj.ID
 	} else {
-		idTag = dj.InnerOperation.IDTag
+		idTag = dj.Operation.ID
 	}
 
 	// try to assert
@@ -244,59 +240,50 @@ func (dj DirtyJSON) ID() (interface{}, error) {
 	}
 }
 
-// Time returns time.Time implementation of created_at from DirtyJSON
-func (dj DirtyJSON) Time() (string, error) {
+// TimeProcessed returns time.Time implementation of created_at from EmbeddedJSON
+func (dj EmbeddedJSON) TimeProcessed() (string, error) {
 	// check if both time values are empty
-	if dj.InnerOperation.CreationTimeTag.IsZero() &&
-		dj.CreationTimeTag.IsZero() {
+	if dj.Operation.CreationTime.IsZero() &&
+		dj.CreationTime.IsZero() {
 		return time.Now().Format(time.RFC3339),
 			fmt.Errorf("%sjson hasn't time tag: %w", dj, ErrSkipOperation)
 	}
 	// check if inner json time is empty
-	if dj.CreationTimeTag.IsZero() {
-		return dj.InnerOperation.CreationTimeTag.Format(time.RFC3339), nil
+	if dj.CreationTime.IsZero() {
+		return dj.Operation.CreationTime.Format(time.RFC3339), nil
 	}
-	return dj.CreationTimeTag.Format(time.RFC3339), nil
+	return dj.CreationTime.Format(time.RFC3339), nil
 }
 
-// String represents DirtyJSON as string through string builder.
-func (dj DirtyJSON) String() string {
-	return fmt.Sprintf("Company: %s\n"+
-		"Type: %s\n"+
-		"Value: %v\n"+
-		"ID: %v\n"+
-		"Time: %s\n%s",
-		dj.CompanyTag, dj.TypeTag, dj.ValueTag, dj.IDTag,
-		dj.CreationTimeTag, dj.InnerOperation)
+// String represents EmbeddedJSON as string through string builder.
+func (dj EmbeddedJSON) String() string {
+	return fmt.Sprintf("CompanyProcessed: %s\n"+
+		"TypeProcessed: %s\n"+
+		"ValueProcessed: %v\n"+
+		"IDProcessed: %v\n"+
+		"TimeProcessed: %s\n%s",
+		dj.Company, dj.Type, dj.Value, dj.ID,
+		dj.CreationTime, dj.Operation)
 }
 
-// String represents DirtyJSON as string through string builder.
-func (inner InnerOperations) String() string {
+// String represents EmbeddedJSON as string through string builder.
+func (inner InnerJSON) String() string {
 	return fmt.Sprintf("Operation:\n"+
-		"\tType: %v\n"+
-		"\tValue: %v\n"+
-		"\tID: %v\n"+
-		"\tTime: %s\n",
-		inner.TypeTag, inner.ValueTag, inner.IDTag, inner.CreationTimeTag)
+		"\tTypeProcessed: %v\n"+
+		"\tValueProcessed: %v\n"+
+		"\tIDProcessed: %v\n"+
+		"\tTimeProcessed: %s\n",
+		inner.Type, inner.Value, inner.ID, inner.CreationTime)
 }
 
 // separateFloat separate float to int part and check fractional for zero-value
-func separateFloat(fields DirtyJSON, fl float64, errorText string) (int64, error) {
+func separateFloat(fields EmbeddedJSON, fl float64, errorText string) (int64, error) {
 	intPart, frac := math.Modf(fl)
 	if frac == 0 {
 		return int64(intPart), nil
 	}
 	return 0, fmt.Errorf("%s%s: %w",
 		fields, errorText, ErrRejectOperation)
-}
-
-// harmonizeValueWithType correlates the operation type with the value sign
-func (operation *Operation) harmonizeValueWithType() {
-	// todo: add overflow checking
-	if (operation.Type == income && operation.Value < 0) ||
-		(operation.Type == outcome && operation.Value > 0) {
-		operation.Value *= -1
-	}
 }
 
 type Operations []Operation
