@@ -79,37 +79,37 @@ func (operation Operation) String() string {
 // UnmarshalJSON implements Unmarshaler interface and represents custom Unmarshal.
 func (operation *Operation) UnmarshalJSON(data []byte) error {
 	// unmarshall json to map
-	var fields EmbeddedJSON
-	if err := json.Unmarshal(data, &fields); err != nil {
+	var embeddedJSON EmbeddedJSON
+	if err := json.Unmarshal(data, &embeddedJSON); err != nil {
 		operation.Status = skip
 	}
 
 	// operations with incorrect company, id or time will be skipped
-	operation.updateOperation(fields)
+	operation.updateOperation(embeddedJSON)
 	return nil
 }
 
 // updateOperation enter fields (field by field) from dirtyJSON to Operation instance.
 // And updates Operation instance's status.
-func (operation *Operation) updateOperation(fields EmbeddedJSON) {
+func (operation *Operation) updateOperation(embeddedJSON EmbeddedJSON) {
 	var err error
-	if operation.Company, err = fields.CompanyProcessed(); err != nil {
+	if operation.Company, err = embeddedJSON.CompanyProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Time, err = fields.TimeProcessed(); err != nil {
+	if operation.Time, err = embeddedJSON.TimeProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.ID, err = fields.IDProcessed(); err != nil {
+	if operation.ID, err = embeddedJSON.IDProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Type, err = fields.TypeProcessed(); err != nil {
+	if operation.Type, err = embeddedJSON.TypeProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
-	if operation.Value, err = fields.ValueProcessed(); err != nil {
+	if operation.Value, err = embeddedJSON.ValueProcessed(); err != nil {
 		switchErrors(operation, err)
 		return
 	}
@@ -277,13 +277,13 @@ func (inner InnerJSON) String() string {
 }
 
 // separateFloat separate float to int part and check fractional for zero-value
-func separateFloat(fields EmbeddedJSON, fl float64, errorText string) (int64, error) {
+func separateFloat(embeddedJSON EmbeddedJSON, fl float64, errorText string) (int64, error) {
 	intPart, frac := math.Modf(fl)
 	if frac == 0 {
 		return int64(intPart), nil
 	}
 	return 0, fmt.Errorf("%s%s: %w",
-		fields, errorText, ErrRejectOperation)
+		embeddedJSON, errorText, ErrRejectOperation)
 }
 
 type Operations []Operation
