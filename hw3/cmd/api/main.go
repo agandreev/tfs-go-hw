@@ -16,6 +16,19 @@ import (
 
 var tickers = []string{"AAPL", "SBER", "NVDA", "TSLA"}
 
+// init removes files from previous sessions
+func init() {
+	for _, path := range domain.PeriodFiles {
+		err := os.Remove(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			panic(err)
+		}
+	}
+}
+
 func main() {
 	logger := log.New()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -24,14 +37,20 @@ func main() {
 	runPipeline(ctx, g, logger)
 
 	// signals checking
-	go func() {
+	g.Go(func() error {
 		term := make(chan os.Signal, 1)
 		signal.Notify(term, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
-		<-term
-		log.Println("Interruption signal was caught")
-		cancel()
-	}()
+		select {
+		case <-term:
+			log.Println("interruption signal was caught")
+			cancel()
+		case <-ctx.Done():
+			log.Println("stop signal-catcher")
+			return ctx.Err()
+		}
+		return nil
+	})
 
 	// pipeline finish checking
 	if err := g.Wait(); err == nil || err == context.Canceled {
@@ -50,18 +69,19 @@ func runPipeline(ctx context.Context, g *errgroup.Group, logger *log.Logger) {
 	})
 
 	logger.Info("start prices generator...")
-	prices := pg.Prices(ctx)
+	prices := pg.Prices(ctx, g)
 	pipe := services.Pipeline{Logger: logger}
 
 	// first step
-	firstCandles, allCandles := pipe.CandlesFromPrices(
+	firstCandles := pipe.CandlesFromPrices(
 		g, prices, domain.CandlePeriod1m)
+	firstCandlesSaved := pipe.SaveCandles(g, firstCandles, true)
 	// second step
-	secondCandles, allCandles := pipe.CandlesFromCandles(
-		g, firstCandles, allCandles, domain.CandlePeriod2m)
+	secondCandles := pipe.CandlesFromCandles(
+		g, firstCandlesSaved, domain.CandlePeriod2m)
+	secondCandlesSaved := pipe.SaveCandles(g, secondCandles, true)
 	// third step
-	thirdCandles, allCandles := pipe.CandlesFromCandles(
-		g, secondCandles, allCandles, domain.CandlePeriod10m)
-	// saving
-	pipe.SaveAllCandles(g, thirdCandles, allCandles)
+	thirdCandles := pipe.CandlesFromCandles(
+		g, secondCandlesSaved, domain.CandlePeriod10m)
+	_ = pipe.SaveCandles(g, thirdCandles, false)
 }

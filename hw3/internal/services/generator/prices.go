@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"time"
 
@@ -28,24 +29,25 @@ type PricesGenerator struct {
 	tickers []string
 }
 
-func (g *PricesGenerator) Prices(ctx context.Context) <-chan domain.Price {
+func (gen *PricesGenerator) Prices(ctx context.Context,
+	g *errgroup.Group,) <-chan domain.Price {
 	prices := make(chan domain.Price)
 
 	startTime := time.Now()
-	go func() {
+	g.Go(func() error {
 		defer close(prices)
 
-		ticker := time.NewTicker(g.delay)
+		ticker := time.NewTicker(gen.delay)
 		for {
 			select {
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			case <-ticker.C:
 				currentTime := time.Now()
 				delta := float64(currentTime.Unix() - startTime.Unix())
-				ts := time.Unix(int64(float64(currentTime.Unix())+delta*g.factor), 0)
+				ts := time.Unix(int64(float64(currentTime.Unix())+delta*gen.factor), 0)
 
-				for idx, ticker := range g.tickers {
+				for idx, ticker := range gen.tickers {
 					min := float64((idx + 1) * 100)
 					max := min + 20
 					prices <- domain.Price{
@@ -56,7 +58,7 @@ func (g *PricesGenerator) Prices(ctx context.Context) <-chan domain.Price {
 				}
 			}
 		}
-	}()
+	})
 
 	return prices
 }
