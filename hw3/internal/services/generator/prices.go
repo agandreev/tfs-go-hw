@@ -2,11 +2,11 @@ package generator
 
 import (
 	"context"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"time"
 
 	"github.com/agandreev/tfs-go-hw/hw3/internal/domain"
+	"golang.org/x/sync/errgroup"
 )
 
 type Config struct {
@@ -30,7 +30,7 @@ type PricesGenerator struct {
 }
 
 func (gen *PricesGenerator) Prices(ctx context.Context,
-	g *errgroup.Group,) <-chan domain.Price {
+	g *errgroup.Group) <-chan domain.Price {
 	prices := make(chan domain.Price)
 
 	startTime := time.Now()
