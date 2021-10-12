@@ -36,22 +36,10 @@ func main() {
 
 	runPipeline(ctx, g, logger)
 
-	// signals checking
-	g.Go(func() error {
-		term := make(chan os.Signal, 1)
-		signal.Notify(term, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-
-		select {
-		case <-term:
-			log.Println("interruption signal was caught")
-			cancel()
-		case <-ctx.Done():
-			log.Println("stop signal-catcher")
-			return ctx.Err()
-		}
-		return nil
-	})
-
+	term := make(chan os.Signal, 1)
+	signal.Notify(term, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-term
+	cancel()
 	// pipeline finish checking
 	if err := g.Wait(); err == nil || err == context.Canceled {
 		log.Println("finished gracefully by interruption")
