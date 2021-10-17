@@ -6,8 +6,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/agandreev/tfs-go-hw/hw4/internal/domain"
@@ -39,7 +42,25 @@ type Claims struct {
 
 func (server *Server) Run() {
 	r := server.registerRoutes()
-	log.Fatal(http.ListenAndServe(":5000", r))
+	srv := http.Server{Addr: "0.0.0.0:5000", Handler: r}
+	sig := make(chan os.Signal, 1)
+	stop := make(chan struct{})
+	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		<-sig
+		err := srv.Shutdown(context.Background())
+		if err != nil {
+			log.Fatal(err)
+		}
+		stop<- struct{}{}
+	}()
+
+	err := srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+
+	<-stop
 }
 
 func (server *Server) registerRoutes() http.Handler {
