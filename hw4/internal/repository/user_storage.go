@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/agandreev/tfs-go-hw/hw4/internal/domain"
@@ -20,6 +21,7 @@ var (
 )
 
 type AuthInMemory struct {
+	rw sync.RWMutex
 	Users map[string]*domain.User
 }
 
@@ -28,16 +30,21 @@ type userClaims struct {
 	UserID uint64 `json:"user_id"`
 }
 
-func (auth AuthInMemory) CreateUser(user domain.User) (uint64, error) {
+func (auth *AuthInMemory) CreateUser(user domain.User) (uint64, error) {
+	auth.rw.RLock()
 	if _, ok := auth.Users[user.Username]; ok {
 		return 0, ErrUserExists
 	}
+	auth.rw.RUnlock()
+
 	user.ID = uint64(len(auth.Users))
+	auth.rw.Lock()
 	auth.Users[user.Username] = &user
+	auth.rw.Unlock()
 	return user.ID, nil
 }
 
-func (auth AuthInMemory) GenerateJWT(user domain.User) (string, error) {
+func (auth *AuthInMemory) GenerateJWT(user domain.User) (string, error) {
 	user, err := auth.GetUser(user.Username, user.Password)
 	if err != nil {
 		return "", err
@@ -54,7 +61,7 @@ func (auth AuthInMemory) GenerateJWT(user domain.User) (string, error) {
 	return token.SignedString([]byte(signingKey))
 }
 
-func (auth AuthInMemory) ParseToken(accessToken string) (uint64, error) {
+func (auth *AuthInMemory) ParseToken(accessToken string) (uint64, error) {
 	token, err := jwt.ParseWithClaims(accessToken, &userClaims{},
 		func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -74,20 +81,24 @@ func (auth AuthInMemory) ParseToken(accessToken string) (uint64, error) {
 	return claims.UserID, nil
 }
 
-func (auth AuthInMemory) GetUser(username, password string) (domain.User, error) {
+func (auth *AuthInMemory) GetUser(username, password string) (domain.User, error) {
+	auth.rw.RLock()
 	if user, ok := auth.Users[username]; ok {
 		if user.Password == password {
 			return *user, nil
 		}
 	}
+	auth.rw.RUnlock()
 	return domain.User{}, ErrUserNotExists
 }
 
-func (auth AuthInMemory) IsUserExist(id uint64) bool {
+func (auth *AuthInMemory) IsUserExist(id uint64) bool {
+	auth.rw.RLock()
 	for _, user := range auth.Users {
 		if user.ID == id {
 			return true
 		}
 	}
+	auth.rw.Unlock()
 	return false
 }
