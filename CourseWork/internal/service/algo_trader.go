@@ -33,7 +33,7 @@ func NewAlgoTrader(users repository.UserRepository, log *logrus.Logger,
 		Users:             users,
 		Pairs:             make(Pairs),
 		API:               *NewKrakenAPI(),
-		MessageWriters:    make([]msgwriters.MessageWriter, 0),
+		MessageWriters:    *msgwriters.NewMessageWriters(log),
 		WG:                &sync.WaitGroup{},
 		reconnectionTimes: reconnections,
 		muPairs:           &sync.Mutex{},
@@ -61,10 +61,10 @@ func (trader AlgoTrader) Run() {
 					message, err := trader.API.AddOrder(event, user)
 					if err != nil {
 						trader.log.Printf("ERROR: order is broken <%s>", err)
-						trader.MessageWriters.WriteError(err.Error(), *user)
+						trader.MessageWriters.WriteErrors(err.Error(), *user)
 						continue
 					}
-					trader.MessageWriters.WriteMessage(message, *user)
+					trader.MessageWriters.WriteMessages(message, *user)
 				}
 				trader.muPairs.Unlock()
 			case pairErr := <-trader.errors:
@@ -82,7 +82,7 @@ func (trader AlgoTrader) Run() {
 								pair.Name, pairErr.Message)
 						}
 					}
-					trader.MessageWriters.WriteErrorToAll(err.Error(), pair.Users)
+					trader.MessageWriters.WriteErrorsToAll(err.Error(), pair.Users)
 				}
 			}
 			trader.log.Println("STOP: all signals were processed gracefully")
@@ -223,5 +223,5 @@ func (trader AlgoTrader) DeletePair(username string, config domain.Config) error
 
 // AddMessageWriter adds message writer into slice.
 func (trader *AlgoTrader) AddMessageWriter(messageWriter msgwriters.MessageWriter) {
-	trader.MessageWriters = append(trader.MessageWriters, messageWriter)
+	trader.MessageWriters.AddWriter(messageWriter)
 }

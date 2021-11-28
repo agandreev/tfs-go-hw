@@ -3,6 +3,7 @@ package msgwriters
 import (
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	tb "gopkg.in/tucnak/telebot.v2"
+	"strconv"
 	"time"
 )
 
@@ -25,8 +26,13 @@ func NewTelegramBot(token string) (*TelegramBot, error) {
 }
 
 func (tg *TelegramBot) InitRoutes() {
-	tg.bot.Handle("/start", func(m *tb.Message) {
-		tg.bot.Send(m.Sender, m.Sender.ID)
+	tg.bot.Handle("/id", func(m *tb.Message) {
+		id := strconv.FormatInt(int64(m.Sender.ID), 10)
+		_, err := tg.bot.Send(m.Sender, id)
+		if err != nil {
+			_, _ = tg.bot.Send(m.Sender, err)
+			return 
+		}
 	})
 	go tg.bot.Start()
 }
@@ -38,6 +44,13 @@ func (tg TelegramBot) WriteMessage(message domain.Message, user domain.User) err
 	return nil
 }
 
-func (tg *TelegramBot) ShutDown() {
+func (tg TelegramBot) WriteError(message string, user domain.User) error {
+	if _, err := tg.bot.Send(&tb.User{ID: int(user.TelegramID)}, message); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (tg TelegramBot) Shutdown() {
 	tg.bot.Stop()
 }

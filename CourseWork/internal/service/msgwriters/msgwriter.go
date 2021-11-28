@@ -1,60 +1,56 @@
 package msgwriters
 
 import (
-	"fmt"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
+	"github.com/sirupsen/logrus"
 )
 
 type MessageWriter interface {
 	WriteMessage(message domain.Message, user domain.User) error
-}
-
-type ErrorWriter interface {
 	WriteError(message string, user domain.User) error
+	Shutdown()
 }
 
-type ConsoleWriter struct {
-
+type MessageWriters struct {
+	Writers []MessageWriter
+	log *logrus.Logger
 }
 
-func (console ConsoleWriter) WriteMessage(message domain.Message, user domain.User) error {
-	fmt.Println(message)
-	return nil
+func NewMessageWriters(log *logrus.Logger) *MessageWriters {
+	return &MessageWriters{
+		Writers: make([]MessageWriter, 0),
+		log:     log,
+	}
 }
 
-func (console ConsoleWriter) WriteError(message string, user domain.User) error {
-	fmt.Println(message)
-	return nil
+func (writers *MessageWriters) AddWriter(writer MessageWriter) {
+	writers.Writers = append(writers.Writers, writer)
 }
 
-type MessageWriters []MessageWriter
-
-func (writers MessageWriters) WriteMessage(message domain.Message, user domain.User) {
-	for _, writer := range writers {
-		err := writer.WriteMessage(message, user)
-		if err != nil {
+func (writers MessageWriters) WriteMessages(message domain.Message, user domain.User) {
+	for _, writer := range writers.Writers {
+		if err := writer.WriteMessage(message, user); err != nil {
+			writers.log.Printf("WRITE: <%s>", err)
 			continue
 		}
 	}
 }
 
-func (writers MessageWriters) WriteError(message string, user domain.User) {
-	for _, writer := range writers {
-		if errorWriter, ok := writer.(ErrorWriter); ok {
-			if err := errorWriter.WriteError(message, user); err != nil {
-				continue
-			}
+func (writers MessageWriters) WriteErrors(message string, user domain.User) {
+	for _, writer := range writers.Writers {
+		if err := writer.WriteError(message, user); err != nil {
+			writers.log.Printf("WRITE: <%s>", err)
+			continue
 		}
 	}
 }
 
-func (writers MessageWriters) WriteErrorToAll(message string, users []*domain.User) {
+func (writers MessageWriters) WriteErrorsToAll(message string, users []*domain.User) {
 	for _, user := range users {
-		for _, writer := range writers {
-			if errorWriter, ok := writer.(ErrorWriter); ok {
-				if err := errorWriter.WriteError(message, *user); err != nil {
-					continue
-				}
+		for _, writer := range writers.Writers {
+			if err := writer.WriteError(message, *user); err != nil {
+				writers.log.Printf("WRITE: <%s>", err)
+				continue
 			}
 		}
 	}
