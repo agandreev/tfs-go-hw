@@ -17,32 +17,57 @@ import (
 )
 
 const (
+	configPath            = "config.env"
 	srvPort               = "SRV_PORT"
 	reconnectionsQuantity = "RECONNECTION_QUANTITY"
 	ttlHours              = "TTL_HOURS"
 	signKey               = "SIGN_KEY"
+	tgToken               = "TG_TOKEN"
 	//apiKey     = "API_KEY"
 	//publicKey  = "vnjLbCnt4ReMVxepNxMqJ2JRh+Wg7Nqebi2YdUy6vhpviF0fnxEPNSjq"
 	//privateKey = "z1JMXEjJXiJmkUUROrujpBzL2P53AixU3Vg3pMt7aFcnrfwpiLok/63BMAcvODFYQRHY4V/o7+i9agSdU4IqAxEu"
-	//tgToken    = "2122664959:AAFQ8E2LCKOb2qfKWhX-qpw4uIvVTLIa0ro"
+	//tgToken = "2122664959:AAFQ8E2LCKOb2qfKWhX-qpw4uIvVTLIa0ro"
 )
 
 func main() {
 	log := logrus.New()
-	port, reconnections, secretKey, ttlHours, err := loadConfig()
+	viper.SetConfigFile(configPath)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf(err.Error())
+	}
+	port, err := loadString(srvPort)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	key, err := loadString(signKey)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	tg, err := loadString(tgToken)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	reconnections, err := loadInt(reconnectionsQuantity)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	hours, err := loadInt(ttlHours)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	users, err := repository.NewUserStorage(secretKey, ttlHours)
+	users, err := repository.NewUserStorage(key, hours)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 	trader := service.NewAlgoTrader(users, log, reconnections)
 	trader.Run()
 
-	cmd := msgwriters.ConsoleWriter{}
-	trader.AddMessageWriter(cmd)
+	tgBot, err := msgwriters.NewTelegramBot(tg)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	trader.AddMessageWriter(tgBot)
 
 	handler := handlers.Handler{Trader: trader}
 
@@ -127,32 +152,7 @@ func main() {
 	//fmt.Println(message)
 }
 
-func loadConfig() (string, int64, string, int64, error) {
-	viper.SetConfigFile("config.env")
-
-	if err := viper.ReadInConfig(); err != nil {
-		return "", 0, "", 0, fmt.Errorf("error while reading config file %s", err)
-	}
-	port, ok := viper.Get(srvPort).(string)
-	if !ok {
-		return "", 0, "", 0, fmt.Errorf("invalid %s type assertion", srvPort)
-	}
-	reconnections, err := getIntFromViper(reconnectionsQuantity)
-	if err != nil {
-		return "", 0, "", 0, err
-	}
-	sign, ok := viper.Get(signKey).(string)
-	if !ok {
-		return "", 0, "", 0, fmt.Errorf("invalid %s type assertion", signKey)
-	}
-	ttl, err := getIntFromViper(ttlHours)
-	if err != nil {
-		return "", 0, "", 0, err
-	}
-	return port, reconnections, sign, ttl, nil
-}
-
-func getIntFromViper(name string) (int64, error) {
+func loadInt(name string) (int64, error) {
 	strValue, ok := viper.Get(name).(string)
 	if !ok {
 		return 0, fmt.Errorf("invalid %s type assertion", name)
@@ -160,6 +160,14 @@ func getIntFromViper(name string) (int64, error) {
 	value, err := strconv.ParseInt(strValue, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid %s type assertion", name)
+	}
+	return value, nil
+}
+
+func loadString(name string) (string, error) {
+	value, ok := viper.Get(name).(string)
+	if !ok {
+		return "", fmt.Errorf("invalid %s type assertion", name)
 	}
 	return value, nil
 }
