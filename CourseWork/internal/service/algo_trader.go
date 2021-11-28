@@ -17,7 +17,6 @@ type AlgoTrader struct {
 	muPairs           *sync.Mutex
 	API               KrakenApi
 	MessageWriters    msgwriters.MessageWriters
-	muWriters         *sync.Mutex
 	WG                *sync.WaitGroup
 	reconnectionTimes int64
 	signals           chan domain.StockMarketEvent
@@ -37,7 +36,6 @@ func NewAlgoTrader(users repository.UserRepository, log *logrus.Logger,
 		WG:                &sync.WaitGroup{},
 		reconnectionTimes: reconnections,
 		muPairs:           &sync.Mutex{},
-		muWriters:         &sync.Mutex{},
 		signals:           make(chan domain.StockMarketEvent),
 		errors:            make(chan PairError),
 		stop:              make(chan struct{}),
