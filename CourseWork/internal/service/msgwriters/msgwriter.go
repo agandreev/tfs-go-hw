@@ -7,7 +7,7 @@ import (
 )
 
 type MessageWriter interface {
-	WriteMessage(message domain.Message, user domain.User) error
+	WriteMessage(message domain.OrderInfo, user domain.User) error
 	WriteError(message string, user domain.User) error
 	Shutdown()
 }
@@ -32,7 +32,7 @@ func (writers *MessageWriters) AddWriter(writer MessageWriter) {
 	writers.muWriters.Unlock()
 }
 
-func (writers MessageWriters) WriteMessages(message domain.Message, user domain.User) {
+func (writers MessageWriters) WriteMessages(message domain.OrderInfo, user domain.User) {
 	writers.muWriters.Lock()
 	for _, writer := range writers.Writers {
 		if err := writer.WriteMessage(message, user); err != nil {
@@ -63,6 +63,14 @@ func (writers MessageWriters) WriteErrorsToAll(message string, users []*domain.U
 				continue
 			}
 		}
+	}
+	writers.muWriters.Unlock()
+}
+
+func (writers MessageWriters) Shutdown() {
+	writers.muWriters.Lock()
+	for _, writer := range writers.Writers {
+		writer.Shutdown()
 	}
 	writers.muWriters.Unlock()
 }

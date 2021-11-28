@@ -31,13 +31,13 @@ func (tg *TelegramBot) InitRoutes() {
 		_, err := tg.bot.Send(m.Sender, id)
 		if err != nil {
 			_, _ = tg.bot.Send(m.Sender, err)
-			return 
+			return
 		}
 	})
 	go tg.bot.Start()
 }
 
-func (tg TelegramBot) WriteMessage(message domain.Message, user domain.User) error {
+func (tg TelegramBot) WriteMessage(message domain.OrderInfo, user domain.User) error {
 	if _, err := tg.bot.Send(&tb.User{ID: int(user.TelegramID)}, message.String()); err != nil {
 		return err
 	}

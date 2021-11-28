@@ -59,7 +59,7 @@ func (api *KrakenApi) getSign(apiPath string, urlValues url.Values,
 }
 
 // AddOrder adds order by StockMarketEvent.
-func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User) (domain.Message, error) {
+func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User) (domain.OrderInfo, error) {
 	urlValues := url.Values{
 		"symbol":     {strings.ToLower(event.Name)},
 		"side":       {string(event.Signal)},
@@ -71,7 +71,7 @@ func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User)
 	req, err := http.NewRequest("POST", orderURL, nil)
 	parse, err := url.Parse(orderURL)
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 	apiPath := parse.Path
 	if strings.HasPrefix(apiPath, derivativePath) {
@@ -79,7 +79,7 @@ func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User)
 	}
 	signature, err := api.getSign(apiPath, urlValues, user.PrivateKey)
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 	req.Header.Add("APIKey", user.PublicKey)
 	req.Header.Add("Authent", signature)
@@ -88,26 +88,26 @@ func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User)
 	//todo: add response code checking
 	resp, err := api.client.Do(req)
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 	var orderResponse domain.OrderResponse
 	err = json.Unmarshal(data, &orderResponse)
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 	if err = checkOrderResponse(orderResponse); err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 
 	message, err := orderResponse.Message()
 	if err != nil {
-		return domain.Message{}, err
+		return domain.OrderInfo{}, err
 	}
 	message.Name = event.Name
 	return message, nil

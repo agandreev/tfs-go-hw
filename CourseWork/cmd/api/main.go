@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/controller"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/handlers"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository"
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/users"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service/msgwriters"
 	"github.com/sirupsen/logrus"
@@ -56,11 +56,11 @@ func main() {
 		log.Fatalf(err.Error())
 	}
 
-	users, err := repository.NewUserStorage(key, hours)
+	userStorage, err := users.NewUserStorage(key, hours)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	trader := service.NewAlgoTrader(users, log, reconnections)
+	trader := service.NewAlgoTrader(userStorage, log, reconnections)
 	trader.Run()
 
 	tgBot, err := msgwriters.NewTelegramBot(tg)

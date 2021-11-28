@@ -1,4 +1,4 @@
-package repository
+package users
 
 import (
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"

@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository"
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/users"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service/msgwriters"
 	"github.com/sirupsen/logrus"
 	"sync"
@@ -12,10 +12,10 @@ import (
 
 // AlgoTrader describes trading service.
 type AlgoTrader struct {
-	Users             repository.UserRepository
+	Users             users.UserRepository
 	Pairs             Pairs
 	muPairs           *sync.Mutex
-	API               KrakenApi
+	API               StockMarketAPI
 	MessageWriters    msgwriters.MessageWriters
 	WG                *sync.WaitGroup
 	reconnectionTimes int64
@@ -26,12 +26,12 @@ type AlgoTrader struct {
 }
 
 // NewAlgoTrader returns pointer to AlgoTrader structure.
-func NewAlgoTrader(users repository.UserRepository, log *logrus.Logger,
+func NewAlgoTrader(users users.UserRepository, log *logrus.Logger,
 	reconnections int64) *AlgoTrader {
 	algoTrader := &AlgoTrader{
 		Users:             users,
 		Pairs:             make(Pairs),
-		API:               *NewKrakenAPI(),
+		API:               NewKrakenAPI(),
 		MessageWriters:    *msgwriters.NewMessageWriters(log),
 		WG:                &sync.WaitGroup{},
 		reconnectionTimes: reconnections,
@@ -99,6 +99,7 @@ func (trader AlgoTrader) ShutDown() {
 	close(trader.signals)
 	close(trader.errors)
 	<-trader.stop
+	trader.MessageWriters.Shutdown()
 }
 
 // AddUser adds user to UserRepository.

@@ -100,20 +100,20 @@ type OrderPriorExecution struct {
 	Side string `json:"side"`
 }
 
-// Message structs info about OrderResponse into struct for further processing.
-func (orderResponse OrderResponse) Message() (Message, error) {
+// Message returns OrderInfo structs info about OrderResponse into struct for further processing.
+func (orderResponse OrderResponse) Message() (OrderInfo, error) {
 	if orderResponse.SendStatus == nil {
-		return Message{}, fmt.Errorf("incorrect received data: SendStatus is nil")
+		return OrderInfo{}, fmt.Errorf("incorrect received data: SendStatus is nil")
 	}
 	if orderResponse.SendStatus.OrderEvents == nil ||
 		len(orderResponse.SendStatus.OrderEvents) == 0 {
-		return Message{}, fmt.Errorf("incorrect received data: OrderEvents is nil")
+		return OrderInfo{}, fmt.Errorf("incorrect received data: OrderEvents is nil")
 	}
 	if orderResponse.SendStatus.OrderEvents[0].OrderPriorExecution == nil {
-		return Message{}, fmt.Errorf(
+		return OrderInfo{}, fmt.Errorf(
 			"incorrect received data: OrderPriorExecution is nil")
 	}
-	return Message{
+	return OrderInfo{
 		Name:    "",
 		OrderID: orderResponse.SendStatus.OrderID,
 		Price:   orderResponse.SendStatus.OrderEvents[0].Price,

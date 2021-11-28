@@ -25,13 +25,13 @@ type Pair struct {
 	Interval  domain.CandleInterval
 	Indicator domain.Indicator
 	stop      chan struct{}
-	socket    KrakenSocket
+	socket    StockMarketSocket
 	ctx       context.Context
 	cancel    context.CancelFunc
 	log       *logrus.Logger
 }
 
-// NewPair return pointer to Pair with custom parameters.
+// NewPair returns pointer to Pair with custom parameters.
 func NewPair(name string, interval domain.CandleInterval, indicatorName string,
 	log *logrus.Logger) (*Pair, error) {
 	pair := &Pair{
@@ -40,7 +40,7 @@ func NewPair(name string, interval domain.CandleInterval, indicatorName string,
 		Interval:  interval,
 		Indicator: domain.NewDonchian(),
 		stop:      make(chan struct{}),
-		socket:    KrakenSocket{log: log},
+		socket:    &KrakenSocket{log: log},
 		ctx:       context.Background(),
 		log:       log,
 	}

@@ -21,8 +21,8 @@ func NewUser(username string) *User {
 	}
 }
 
-// Message consists of order's information to notify users about their deals.
-type Message struct {
+// OrderInfo consists of order's information to notify users about their deals.
+type OrderInfo struct {
 	Name    string
 	OrderID string
 	Price   float64
@@ -30,12 +30,12 @@ type Message struct {
 	Side    string
 }
 
-func (message Message) String() string {
+func (orderInfo OrderInfo) String() string {
 	return fmt.Sprintf("Name: <%s>,\n"+
 		"OrderID: <%s>,\n"+
 		"Price: <%.2f>,\n"+
 		"Amount: <%d>,\n"+
-		"Side: <%s>", message.Name, message.OrderID, message.Price, message.Amount, message.Side)
+		"Side: <%s>", orderInfo.Name, orderInfo.OrderID, orderInfo.Price, orderInfo.Amount, orderInfo.Side)
 }
 
 // Config consists of necessary information for trading staring.
