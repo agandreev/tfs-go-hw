@@ -21,6 +21,8 @@ const (
 	orderURL       = "https://demo-futures.kraken.com/derivatives/api/v3/sendorder"
 	derivativePath = "/derivatives"
 	ioc            = "ioc"
+	success        = "success"
+	placed         = "placed"
 )
 
 // KrakenApi implements Rest API communication with stock market.
@@ -113,10 +115,10 @@ func (api *KrakenApi) AddOrder(event domain.StockMarketEvent, user *domain.User)
 
 // checkOrderResponse checks order status.
 func checkOrderResponse(response domain.OrderResponse) error {
-	if response.Result != "success" {
+	if response.Result != success {
 		return fmt.Errorf("can't process order cause of stock market side problem")
 	}
-	if response.SendStatus.Status != "placed" {
+	if response.SendStatus.Status != placed {
 		return fmt.Errorf("can't process order because of <%s>", response.SendStatus.Status)
 	}
 	return nil
