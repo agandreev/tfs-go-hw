@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/orders"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/users"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service/msgwriters"
 	"github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ import (
 type AlgoTrader struct {
 	Users             users.UserRepository
 	Pairs             Pairs
+	Orders            orders.OrderRepository
 	muPairs           *sync.Mutex
 	API               StockMarketAPI
 	MessageWriters    msgwriters.MessageWriters
@@ -26,11 +28,12 @@ type AlgoTrader struct {
 }
 
 // NewAlgoTrader returns pointer to AlgoTrader structure.
-func NewAlgoTrader(users users.UserRepository, log *logrus.Logger,
-	reconnections int64) *AlgoTrader {
+func NewAlgoTrader(users users.UserRepository, orders orders.OrderRepository,
+	log *logrus.Logger, reconnections int64) *AlgoTrader {
 	algoTrader := &AlgoTrader{
 		Users:             users,
 		Pairs:             make(Pairs),
+		Orders:            orders,
 		API:               NewKrakenAPI(),
 		MessageWriters:    *msgwriters.NewMessageWriters(log),
 		WG:                &sync.WaitGroup{},
@@ -54,40 +57,57 @@ func (trader AlgoTrader) Run() {
 				if !ok {
 					break
 				}
-				trader.muPairs.Lock()
-				for _, user := range trader.Pairs[event.Name][event.Interval].Users {
-					message, err := trader.API.AddOrder(event, user)
-					if err != nil {
-						trader.log.Printf("ERROR: order is broken <%s>", err)
-						trader.MessageWriters.WriteErrors(err.Error(), *user)
-						continue
-					}
-					trader.MessageWriters.WriteMessages(message, *user)
-				}
-				trader.muPairs.Unlock()
+				trader.stockEventHandler(event)
 			case pairErr := <-trader.errors:
-				trader.WG.Done()
-				pair := trader.Pairs[pairErr.Name][pairErr.Interval]
-				err := trader.RunPair(pair)
-				if err != nil {
-					if len(pair.Users) == 0 {
-						delete(trader.Pairs[pair.Name], pair.Interval)
-						trader.log.Printf("DELETE: pair <%s> <%s> by error <%s>",
-							pair.Name, pair.Interval, pairErr.Message)
-						if len(trader.Pairs[pair.Name]) == 0 {
-							delete(trader.Pairs, pair.Name)
-							trader.log.Printf("DELETE: pair <%s> was deleted entirely by error <%s>",
-								pair.Name, pairErr.Message)
-						}
-					}
-					trader.MessageWriters.WriteErrorsToAll(err.Error(), pair.Users)
-				}
+				trader.stockErrorHandler(pairErr)
 			}
 			trader.log.Println("STOP: all signals were processed gracefully")
 			trader.stop <- struct{}{}
 			break
 		}
 	}()
+}
+
+// stockEventHandler process Indicator signals and transfer information.
+func (trader AlgoTrader) stockEventHandler(event domain.StockMarketEvent) {
+	trader.muPairs.Lock()
+	for _, user := range trader.Pairs[event.Name][event.Interval].Users {
+		orderInfo, err := trader.API.AddOrder(event, user)
+		if err != nil {
+			trader.log.Printf("ERROR: order is broken <%s>", err)
+			trader.MessageWriters.WriteErrors(err.Error(), *user)
+			continue
+		}
+		trader.MessageWriters.WriteMessages(orderInfo, *user)
+		if err = trader.Orders.AddOrder(orderInfo); err != nil {
+			trader.log.Printf("DB: <%s>", err)
+			continue
+		}
+		trader.log.Println("DB: order is created successfully")
+	}
+	trader.muPairs.Unlock()
+}
+
+// stockErrorHandler tries to recover dead pair and delete it.
+func (trader AlgoTrader) stockErrorHandler(pairErr PairError) {
+	trader.muPairs.Lock()
+	trader.WG.Done()
+	pair := trader.Pairs[pairErr.Name][pairErr.Interval]
+	// try to recover pair or delete it
+	if err := trader.RunPair(pair); err != nil {
+		if len(pair.Users) == 0 {
+			delete(trader.Pairs[pair.Name], pair.Interval)
+			trader.log.Printf("DELETE: pair <%s> <%s> by error <%s>",
+				pair.Name, pair.Interval, pairErr.Message)
+			if len(trader.Pairs[pair.Name]) == 0 {
+				delete(trader.Pairs, pair.Name)
+				trader.log.Printf("DELETE: pair <%s> was deleted entirely by error <%s>",
+					pair.Name, pairErr.Message)
+			}
+		}
+		trader.MessageWriters.WriteErrorsToAll(err.Error(), pair.Users)
+	}
+	trader.muPairs.Unlock()
 }
 
 // ShutDown gracefully stops all running pairs.
@@ -99,6 +119,7 @@ func (trader AlgoTrader) ShutDown() {
 	close(trader.signals)
 	close(trader.errors)
 	<-trader.stop
+	trader.Orders.Shutdown()
 	trader.MessageWriters.Shutdown()
 }
 

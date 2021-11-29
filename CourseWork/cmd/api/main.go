@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/controller"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/handlers"
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/orders"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/users"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service/msgwriters"
@@ -23,6 +24,10 @@ const (
 	ttlHours              = "TTL_HOURS"
 	signKey               = "SIGN_KEY"
 	tgToken               = "TG_TOKEN"
+	dbUser                = "DB_USER"
+	dbPSWD                = "DB_PSWD"
+	dbName                = "db_Name"
+	dbPort                = "DB_Port"
 	//apiKey     = "API_KEY"
 	//publicKey  = "vnjLbCnt4ReMVxepNxMqJ2JRh+Wg7Nqebi2YdUy6vhpviF0fnxEPNSjq"
 	//privateKey = "z1JMXEjJXiJmkUUROrujpBzL2P53AixU3Vg3pMt7aFcnrfwpiLok/63BMAcvODFYQRHY4V/o7+i9agSdU4IqAxEu"
@@ -31,6 +36,11 @@ const (
 
 func main() {
 	log := logrus.New()
+
+	orderStorage, err := connectDB()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 	viper.SetConfigFile(configPath)
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf(err.Error())
@@ -60,7 +70,7 @@ func main() {
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	trader := service.NewAlgoTrader(userStorage, log, reconnections)
+	trader := service.NewAlgoTrader(userStorage, orderStorage, log, reconnections)
 	trader.Run()
 
 	tgBot, err := msgwriters.NewTelegramBot(tg)
@@ -89,67 +99,6 @@ func main() {
 	if err = srv.Shutdown(context.Background()); err != nil {
 		log.Errorf("ERROR: graceful shutdown is broken <%s>", err.Error())
 	}
-
-	//log := logrus.New()
-	//
-	//user := domain.NewUser("1")
-	//user2 := domain.NewUser("2")
-	//user2.PublicKey = "sf"
-	//user2.PrivateKey = "sdf"
-	//user.PublicKey = publicKey
-	//user.PrivateKey = privateKey
-	//
-	//users := repository.NewUserStorage()
-	//algoTrader := service.NewAlgoTrader(users, log)
-	//algoTrader.Run()
-	//err := algoTrader.AddUser(*user)
-	//err = algoTrader.AddUser(*user2)
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//err = algoTrader.AddPair("2", "FI_ETHUSD_211126", domain.Candle5m)
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//err = algoTrader.AddPair("1", "FI_ETHUSD_211126", domain.Candle1m)
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//err = algoTrader.AddPair("1", "FI_ETHUSD_211126", domain.Candle5m)
-	//if err != nil {
-	//	log.Println(err)
-	//	return
-	//}
-	//
-	//<-time.Tick(time.Second * 5)
-	//algoTrader.DeletePair("1", "FI_ETHUSD_211126", domain.Candle1m)
-	//
-	//<-time.Tick(time.Second * 5)
-	//algoTrader.ShutDown()
-
-	//api := service.NewKrakenAPI()
-	//event := domain.StockMarketEvent{
-	//	Signal: domain.Sell,
-	//	Name:   "PI_BCHUSD",
-	//	Volume: 5000,
-	//	Close:  577,
-	//}
-	//message, err := api.AddOrder(event, &domain.User{
-	//	Username:         1,
-	//	PublicKey:  publicKey,
-	//	PrivateKey: privateKey,
-	//})
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return
-	//}
-	//fmt.Println(message)
 }
 
 func loadInt(name string) (int64, error) {
@@ -170,4 +119,25 @@ func loadString(name string) (string, error) {
 		return "", fmt.Errorf("invalid %s type assertion", name)
 	}
 	return value, nil
+}
+
+func connectDB() (*orders.OrderStorage, error) {
+	user, err := loadString(dbUser)
+	if err != nil {
+		return nil, err
+	}
+	password, err := loadString(dbPSWD)
+	name, err := loadString(dbName)
+	port, err := loadString(dbPort)
+	orderStorage := orders.OrderStorage{}
+	err = orderStorage.Connect(orders.ConnectionConfig{
+		Username: user,
+		Password: password,
+		NameDB:   name,
+		Port:     port,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &orderStorage, nil
 }
