@@ -2,9 +2,10 @@ package controller
 
 import (
 	"context"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/handlers"
 	"net/http"
 	"time"
+
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/handlers"
 )
 
 // Server represents http server structure with handler's implementations.

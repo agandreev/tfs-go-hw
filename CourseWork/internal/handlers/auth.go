@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 )
 
 // ctxKey is necessary for context value transfer.
@@ -18,30 +19,31 @@ func (handler *Handler) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	d, err := io.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		processError(w, http.StatusInternalServerError, err)
 		return
 	}
 	defer r.Body.Close()
 
 	if err = json.Unmarshal(d, &input); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		processError(w, http.StatusBadRequest, err)
 		return
 	}
 	token, err := handler.Trader.Users.GenerateJWT(input)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		processError(w, http.StatusBadRequest, err)
 		return
 	}
 
 	data, err := json.Marshal(map[string]interface{}{"token": token})
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		processError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if _, err = w.Write(data); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		processError(w, http.StatusInternalServerError, err)
 		return
 	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 // authHandler handles auth algorithm.

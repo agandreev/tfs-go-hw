@@ -1,16 +1,11 @@
-package msgwriters
+package service
 
 import (
+	"sync"
+
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
-
-type MessageWriter interface {
-	WriteMessage(message domain.OrderInfo, user domain.User) error
-	WriteError(message string, user domain.User) error
-	Shutdown()
-}
 
 type MessageWriters struct {
 	Writers   []MessageWriter

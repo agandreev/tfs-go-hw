@@ -41,24 +41,24 @@ type CandleJSON struct {
 func (candle *Candle) UnmarshalJSON(data []byte) error {
 	var candleJSON CandleJSON
 	if err := json.Unmarshal(data, &candleJSON); err != nil {
-		return err
+		return fmt.Errorf("can't unmarshal <%w>", err)
 	}
 
 	high, err := strconv.ParseFloat(candleJSON.High, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't parse high <%w>", err)
 	}
 	low, err := strconv.ParseFloat(candleJSON.Low, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't parse low <%w>", err)
 	}
 	open, err := strconv.ParseFloat(candleJSON.Open, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't parse open <%w>", err)
 	}
 	cl, err := strconv.ParseFloat(candleJSON.Close, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't parse close <%w>", err)
 	}
 	candle.High = high
 	candle.Low = low
@@ -70,13 +70,27 @@ func (candle *Candle) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Check checks candle fields for positive values.
-func (candle Candle) Check() bool {
-	if candle.Low < 0 || candle.High < 0 || candle.Time < 0 ||
-		candle.Close < 0 || candle.Open < 0 || candle.Volume < 0 {
-		return false
+// Validate checks candle fields for positive values.
+func (candle Candle) Validate() error {
+	if candle.Low < 0 {
+		return fmt.Errorf("candle low is less than zero")
 	}
-	return true
+	if candle.High < 0 {
+		return fmt.Errorf("candle high is less than zero")
+	}
+	if candle.Time < 0 {
+		return fmt.Errorf("candle time is less than zero")
+	}
+	if candle.Close < 0 {
+		return fmt.Errorf("candle close is less than zero")
+	}
+	if candle.Open < 0 {
+		return fmt.Errorf("candle open is less than zero")
+	}
+	if candle.Volume < 0 {
+		return fmt.Errorf("candle volume is less than zero")
+	}
+	return nil
 }
 
 func (candle Candle) String() string {

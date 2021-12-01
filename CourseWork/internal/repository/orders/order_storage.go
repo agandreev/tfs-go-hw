@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -13,7 +14,8 @@ var (
 )
 
 type OrderStorage struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	Config ConnectionConfig
 }
 
 type ConnectionConfig struct {
@@ -23,12 +25,13 @@ type ConnectionConfig struct {
 	Port     string
 }
 
-func (storage *OrderStorage) Connect(config ConnectionConfig) error {
+func (storage *OrderStorage) Connect() error {
 	dsn := fmt.Sprintf("postgres://%s:%s@localhost:%s/%s"+
-		"?sslmode=disable", config.Username, config.Password, config.Port, config.NameDB)
+		"?sslmode=disable", storage.Config.Username, storage.Config.Password,
+		storage.Config.Port, storage.Config.NameDB)
 	pool, err := pgxpool.Connect(context.Background(), dsn)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't connect db <%w>", err)
 	}
 	storage.pool = pool
 	return nil
@@ -42,7 +45,7 @@ func (storage OrderStorage) AddOrder(info domain.OrderInfo) error {
 		"INSERT INTO orders(name, orderID, price, amount, side) VALUES($1, $2, $3, $4, $5)", info.Name,
 		info.OrderID, info.Price, info.Amount, info.Side)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't add to db <%w>", err)
 	}
 	return nil
 }
@@ -54,7 +57,7 @@ func (storage OrderStorage) GetOrders(offset int64) ([]domain.OrderInfo, error) 
 	}
 	defer rows.Close()
 
-	var counter int64 = 0
+	var counter int64
 	var tmp domain.OrderInfo
 	var id int64
 	infos := make([]domain.OrderInfo, 0)
@@ -62,17 +65,19 @@ func (storage OrderStorage) GetOrders(offset int64) ([]domain.OrderInfo, error) 
 	for rows.Next() && (counter < offset) {
 		err = rows.Scan(&id, &tmp.Name, &tmp.OrderID, &tmp.Price, &tmp.Amount, &tmp.Side)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("can't read from db <%w>", err)
 		}
 		infos = append(infos, tmp)
 		counter++
 	}
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("buf db error <%w>", err)
 	}
 	return infos, nil
 }
 
 func (storage OrderStorage) Shutdown() {
-	storage.pool.Close()
+	if storage.pool != nil {
+		storage.pool.Close()
+	}
 }

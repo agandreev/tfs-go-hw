@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCandleQueue(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCandleQueue_High(t *testing.T) {
 	candleQueue.Add(Candle{High: 1})
 	candleQueue.Add(Candle{High: 3})
 	candleQueue.Add(Candle{High: 2})
-	assert.Equal(t, candleQueue.High(), 3.0)
+	assert.Equal(t, candleQueue.High, 3.0)
 }
 
 func TestCandleQueue_Low(t *testing.T) {
@@ -36,7 +37,7 @@ func TestCandleQueue_Low(t *testing.T) {
 	candleQueue.Add(Candle{Low: 3})
 	candleQueue.Add(Candle{Low: 1})
 	candleQueue.Add(Candle{Low: 2})
-	assert.Equal(t, candleQueue.Low(), 1.0)
+	assert.Equal(t, candleQueue.Low, 1.0)
 }
 
 func TestCandleQueue_Len(t *testing.T) {

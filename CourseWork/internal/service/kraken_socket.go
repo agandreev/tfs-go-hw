@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -50,7 +51,7 @@ func (socket *KrakenSocket) Connect(ctx context.Context) error {
 	}
 	socket.ws = connection
 	socket.ctx = ctx
-	return err
+	return fmt.Errorf("error in socket connection: <%w>", err)
 }
 
 // SubscribeCandle subscribes candle's socket.
@@ -69,17 +70,17 @@ func (socket KrakenSocket) SubscribeCandle(pair Pair, candles chan domain.Candle
 
 	err := socket.ws.WriteJSON(subscriptionHeartbeatRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("error in heartbeat subscription: <%w>", err)
 	}
 
 	err = socket.ws.WriteJSON(subscriptionCandleRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("error in candle subscription: <%w>", err)
 	}
 
 	err = socket.readInfoMessages()
 	if err != nil {
-		return err
+		return fmt.Errorf("error in subscription reading: <%w>", err)
 	}
 
 	socket.runPipeLine(pair, candles, errors)
@@ -98,14 +99,14 @@ func (socket KrakenSocket) runPipeLine(pair Pair, candles chan domain.Candle,
 			case <-socket.ctx.Done():
 				return
 			default:
-				err := socket.ws.ReadJSON(&candleMessage)
-				if err != nil {
-					socket.log.Printf("ERROR: <%s> has lost connection", pair.Name)
+				if err := socket.ws.ReadJSON(&candleMessage); err != nil {
+					socket.log.Printf("ERROR: <%s> has lost connection <%s>", pair.Name, err)
 					errors <- PairError{
 						Name:     pair.Name,
 						Interval: pair.Interval,
 						Message:  err.Error(),
 					}
+					return
 				}
 				if !(candleMessage.Feed == "heartbeat") {
 					candles <- candleMessage.Candle

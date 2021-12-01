@@ -3,18 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/controller"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/handlers"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/orders"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/repository/users"
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/service/msgwriters"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
 )
 
 const (
@@ -28,56 +29,40 @@ const (
 	dbPSWD                = "DB_PSWD"
 	dbName                = "db_Name"
 	dbPort                = "DB_Port"
-	//apiKey     = "API_KEY"
-	//publicKey  = "vnjLbCnt4ReMVxepNxMqJ2JRh+Wg7Nqebi2YdUy6vhpviF0fnxEPNSjq"
-	//privateKey = "z1JMXEjJXiJmkUUROrujpBzL2P53AixU3Vg3pMt7aFcnrfwpiLok/63BMAcvODFYQRHY4V/o7+i9agSdU4IqAxEu"
-	//tgToken = "2122664959:AAFQ8E2LCKOb2qfKWhX-qpw4uIvVTLIa0ro"
+	logFile               = "logs.txt"
 )
 
 func main() {
 	log := logrus.New()
+	file, err := os.OpenFile(logFile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	defer file.Close()
+	mw := io.MultiWriter(os.Stdout, file)
+	log.SetOutput(mw)
 
-	orderStorage, err := connectDB()
+	port, key, tg, reconnections, hours, orderConfig, err := loadConfig()
 	if err != nil {
-		log.Fatalf(err.Error())
+		return
 	}
-	viper.SetConfigFile(configPath)
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf(err.Error())
-	}
-	port, err := loadString(srvPort)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	key, err := loadString(signKey)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	tg, err := loadString(tgToken)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	reconnections, err := loadInt(reconnectionsQuantity)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-	hours, err := loadInt(ttlHours)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
+	orderStorage := orders.OrderStorage{Config: *orderConfig}
 
 	userStorage, err := users.NewUserStorage(key, hours)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	trader := service.NewAlgoTrader(userStorage, orderStorage, log, reconnections)
-	trader.Run()
 
-	tgBot, err := msgwriters.NewTelegramBot(tg)
+	tgBot, err := service.NewTelegramBot(tg)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+
+	trader := service.NewAlgoTrader(userStorage, &orderStorage, log, reconnections)
 	trader.AddMessageWriter(tgBot)
+	if err = trader.Run(); err != nil {
+		log.Fatalf(err.Error())
+	}
 
 	handler := handlers.Handler{Trader: trader}
 
@@ -121,23 +106,60 @@ func loadString(name string) (string, error) {
 	return value, nil
 }
 
-func connectDB() (*orders.OrderStorage, error) {
+func loadConfig() (string, string, string, int64, int64, *orders.ConnectionConfig, error) {
+	viper.SetConfigFile(configPath)
+	if err := viper.ReadInConfig(); err != nil {
+		return "", "", "", 0, 0, nil, fmt.Errorf("can't load config: %w", err)
+	}
+	port, err := loadString(srvPort)
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	key, err := loadString(signKey)
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	tg, err := loadString(tgToken)
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	reconnections, err := loadInt(reconnectionsQuantity)
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	hours, err := loadInt(ttlHours)
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	connectionConfig, err := loadDBVars()
+	if err != nil {
+		return "", "", "", 0, 0, nil, err
+	}
+	return port, key, tg, reconnections, hours, connectionConfig, nil
+}
+
+func loadDBVars() (*orders.ConnectionConfig, error) {
 	user, err := loadString(dbUser)
 	if err != nil {
 		return nil, err
 	}
 	password, err := loadString(dbPSWD)
+	if err != nil {
+		return nil, err
+	}
 	name, err := loadString(dbName)
+	if err != nil {
+		return nil, err
+	}
 	port, err := loadString(dbPort)
-	orderStorage := orders.OrderStorage{}
-	err = orderStorage.Connect(orders.ConnectionConfig{
+	if err != nil {
+		return nil, err
+	}
+	orderConfig := &orders.ConnectionConfig{
 		Username: user,
 		Password: password,
 		NameDB:   name,
 		Port:     port,
-	})
-	if err != nil {
-		return nil, err
 	}
-	return &orderStorage, nil
+	return orderConfig, nil
 }

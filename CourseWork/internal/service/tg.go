@@ -1,10 +1,12 @@
-package msgwriters
+package service
 
 import (
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
-	tb "gopkg.in/tucnak/telebot.v2"
+	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 type TelegramBot struct {
@@ -38,6 +40,9 @@ func (tg *TelegramBot) InitRoutes() {
 }
 
 func (tg TelegramBot) WriteMessage(message domain.OrderInfo, user domain.User) error {
+	if user.TelegramID == 0 {
+		return fmt.Errorf("user hasn't telegram id")
+	}
 	if _, err := tg.bot.Send(&tb.User{ID: int(user.TelegramID)}, message.String()); err != nil {
 		return err
 	}
@@ -45,8 +50,9 @@ func (tg TelegramBot) WriteMessage(message domain.OrderInfo, user domain.User) e
 }
 
 func (tg TelegramBot) WriteError(message string, user domain.User) error {
+	fmt.Println(user)
 	if _, err := tg.bot.Send(&tb.User{ID: int(user.TelegramID)}, message); err != nil {
-		return err
+		return fmt.Errorf("can't send message to tg user: <%w>", err)
 	}
 	return nil
 }

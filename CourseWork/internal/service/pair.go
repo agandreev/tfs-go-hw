@@ -1,12 +1,15 @@
 package service
 
+//go:generate mockgen -source=pair.go -destination=pair_mock.go
+
 import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+
 	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
 	"github.com/sirupsen/logrus"
-	"sync"
 )
 
 const (
@@ -18,12 +21,22 @@ var (
 	ErrUserIsNotLogged = errors.New("current user is not logged")
 )
 
+type StockMarketSocket interface {
+	Connect(context.Context) error
+	SubscribeCandle(Pair, chan domain.Candle, chan PairError) error
+}
+
+// Indicator implements strategy of stock market service.
+type Indicator interface {
+	Add(candle domain.Candle) (domain.Signal, error)
+}
+
 // Pair describes stock market pair entity.
 type Pair struct {
 	Name      string
 	Users     []*domain.User
 	Interval  domain.CandleInterval
-	Indicator domain.Indicator
+	Indicator Indicator
 	stop      chan struct{}
 	socket    StockMarketSocket
 	ctx       context.Context
@@ -100,20 +113,21 @@ func (pair *Pair) Run(events chan domain.StockMarketEvent, errors chan PairError
 	pair.cancel = cancel
 	candles := make(chan domain.Candle)
 	if err := pair.socket.Connect(ctx); err != nil {
-		return err
+		return fmt.Errorf("can't run pair: <%w>", err)
 	}
 	err := pair.socket.SubscribeCandle(*pair, candles, errors)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't run pair: <%w>", err)
 	}
 	go func() {
-		var previousTimestamp int64
 		for candle := range candles {
-			if previousTimestamp == candle.Time {
-				continue
-			}
 			signal, err := pair.Indicator.Add(candle)
 			if err != nil {
+				// timestamp checking
+				if err == domain.ErrSameTimestamp {
+					continue
+				}
+				// other error sending
 				errors <- PairError{
 					Name:     pair.Name,
 					Interval: pair.Interval,
@@ -124,13 +138,13 @@ func (pair *Pair) Run(events chan domain.StockMarketEvent, errors chan PairError
 			pair.log.Printf("%s Signal: %s", candle, signal)
 			if signal == domain.Buy || signal == domain.Sell {
 				events <- domain.StockMarketEvent{
-					Signal: signal,
-					Name:   pair.Name,
-					Volume: candle.Volume,
-					Close:  candle.Close,
+					Signal:   signal,
+					Name:     pair.Name,
+					Interval: pair.Interval,
+					Volume:   candle.Volume,
+					Close:    candle.Close,
 				}
 			}
-			previousTimestamp = candle.Time
 		}
 		pair.log.Printf("STOP: <%s> <%s> was interrupted gracefully", pair.Name, pair.Interval)
 		pair.stop <- struct{}{}
@@ -171,7 +185,7 @@ func (pairs Pairs) Shutdown(wg *sync.WaitGroup) {
 	wg.Wait()
 }
 
-// AddPair addsPair to nested pair's map.
+// AddPair adds Pair to nested pair's map.
 func (pairs Pairs) AddPair(pair *Pair, user *domain.User) error {
 	pairs[pair.Name][pair.Interval] = pair
 	if err := pair.AddUser(user); err != nil {

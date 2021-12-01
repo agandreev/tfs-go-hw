@@ -3,10 +3,11 @@ package users
 import (
 	"errors"
 	"fmt"
-	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
-	"github.com/golang-jwt/jwt"
 	"sync"
 	"time"
+
+	"github.com/agandreev/tfs-go-hw/CourseWork/internal/domain"
+	"github.com/golang-jwt/jwt"
 )
 
 var (
@@ -74,11 +75,11 @@ func (u UserStorage) DeleteUser(username string) error {
 func (u UserStorage) GetUser(username string) (*domain.User, error) {
 	u.muUsers.RLock()
 	defer u.muUsers.RUnlock()
-	if user, ok := u.users[username]; !ok {
+	user, ok := u.users[username]
+	if !ok {
 		return nil, ErrNonExistentUser
-	} else {
-		return user, nil
 	}
+	return user, nil
 }
 
 // SetKeys edits user's keys.
@@ -120,7 +121,7 @@ func (u UserStorage) GenerateJWT(user domain.User) (string, error) {
 	return token.SignedString([]byte(u.signKey))
 }
 
-//ParseToken parses JWT token.
+// ParseToken parses JWT token.
 func (u UserStorage) ParseToken(accessToken string) (string, error) {
 	token, err := jwt.ParseWithClaims(accessToken, &userClaims{},
 		func(token *jwt.Token) (interface{}, error) {
@@ -130,7 +131,7 @@ func (u UserStorage) ParseToken(accessToken string) (string, error) {
 			return []byte(u.signKey), nil
 		})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("token parsing error <%w>", err)
 	}
 
 	claims, ok := token.Claims.(*userClaims)
