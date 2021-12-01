@@ -113,11 +113,11 @@ func (pair *Pair) Run(events chan domain.StockMarketEvent, errors chan PairError
 	pair.cancel = cancel
 	candles := make(chan domain.Candle)
 	if err := pair.socket.Connect(ctx); err != nil {
-		return fmt.Errorf("can't run pair: <%w>", err)
+		return fmt.Errorf("can't connect <%w>", err)
 	}
 	err := pair.socket.SubscribeCandle(*pair, candles, errors)
 	if err != nil {
-		return fmt.Errorf("can't run pair: <%w>", err)
+		return fmt.Errorf("can't sucscribe candle <%w>", err)
 	}
 	go func() {
 		for candle := range candles {

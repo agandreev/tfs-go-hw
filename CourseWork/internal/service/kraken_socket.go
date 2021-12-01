@@ -41,17 +41,14 @@ func (socket *KrakenSocket) Connect(ctx context.Context) error {
 	connection, response, err := websocket.DefaultDialer.Dial(wsLink, nil)
 	if err != nil {
 		socket.log.Printf("ERROR creating connection to url, %v", err)
+		return fmt.Errorf("error in socket connection: <%w>", err)
 	} else {
 		socket.log.Printf("SUCCESS: Connection established with %s  \n", wsLink)
-
-		if err != nil {
-			socket.log.Println("Error marshaling json:", err)
-		}
 		socket.log.Printf("RESPONSE: %+v", *response)
 	}
 	socket.ws = connection
 	socket.ctx = ctx
-	return fmt.Errorf("error in socket connection: <%w>", err)
+	return nil
 }
 
 // SubscribeCandle subscribes candle's socket.

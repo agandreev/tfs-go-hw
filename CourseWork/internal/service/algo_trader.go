@@ -233,6 +233,7 @@ func (trader *AlgoTrader) AddAndRunPair(pairName string, pairInterval domain.Can
 // RunPair runs pair and reconnect it if it's possible.
 func (trader AlgoTrader) RunPair(pair *Pair) error {
 	if err := pair.Run(trader.signals, trader.errors); err != nil {
+		trader.log.Printf("can't run pair <%s>", err)
 		// reconnection
 		ticker := time.NewTicker(5 * time.Second)
 		var i int64
@@ -264,9 +265,8 @@ func (trader AlgoTrader) DeletePair(username string, config domain.Config) error
 	if intervals, ok := trader.Pairs[config.PairName]; ok {
 		if pair, ok := intervals[config.PairInterval]; ok {
 			if err = pair.DeleteUser(user); err != nil {
-				return fmt.Errorf("can't delete user in trader: <%w>", err)
+				return fmt.Errorf("can't validate config to delete pair in trader: <%w>", err)
 			}
-			// pair stopping
 			if len(pair.Users) == 0 {
 				pair.Stop(trader.WG)
 				delete(trader.Pairs[pair.Name], pair.Interval)
