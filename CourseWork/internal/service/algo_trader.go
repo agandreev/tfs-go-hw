@@ -46,7 +46,7 @@ type AlgoTrader struct {
 	muPairs           *sync.Mutex
 	API               StockMarketAPI
 	MessageWriters    MessageWriters
-	WG                *sync.WaitGroup
+	wg                *sync.WaitGroup
 	reconnectionTimes int64
 	signals           chan domain.StockMarketEvent
 	errors            chan PairError
@@ -63,7 +63,7 @@ func NewAlgoTrader(users UserRepository, orders OrderRepository,
 		Orders:            orders,
 		API:               NewKrakenAPI(),
 		MessageWriters:    *NewMessageWriters(log),
-		WG:                &sync.WaitGroup{},
+		wg:                &sync.WaitGroup{},
 		reconnectionTimes: reconnections,
 		muPairs:           &sync.Mutex{},
 		signals:           make(chan domain.StockMarketEvent),
@@ -130,7 +130,7 @@ func (trader AlgoTrader) stockEventHandler(event domain.StockMarketEvent) {
 func (trader AlgoTrader) stockErrorHandler(pairErr PairError) {
 	trader.muPairs.Lock()
 	defer trader.muPairs.Unlock()
-	trader.WG.Done()
+	trader.wg.Done()
 	pair := trader.Pairs[pairErr.Name][pairErr.Interval]
 	// try to recover pair or delete it
 	if err := trader.RunPair(pair); err != nil {
@@ -151,7 +151,7 @@ func (trader AlgoTrader) stockErrorHandler(pairErr PairError) {
 // ShutDown gracefully stops all running pairs.
 func (trader AlgoTrader) ShutDown() {
 	trader.muPairs.Lock()
-	trader.Pairs.Shutdown(trader.WG)
+	trader.Pairs.Shutdown(trader.wg)
 	trader.muPairs.Unlock()
 	trader.log.Println("STOP: All pairs were interrupted gracefully")
 	close(trader.signals)
@@ -247,7 +247,7 @@ func (trader AlgoTrader) RunPair(pair *Pair) error {
 			return fmt.Errorf("can't connect pair in trader: <%w>", err)
 		}
 	}
-	trader.WG.Add(1)
+	trader.wg.Add(1)
 	return nil
 }
 
@@ -268,7 +268,7 @@ func (trader AlgoTrader) DeletePair(username string, config domain.Config) error
 				return fmt.Errorf("can't validate config to delete pair in trader: <%w>", err)
 			}
 			if len(pair.Users) == 0 {
-				pair.Stop(trader.WG)
+				pair.Stop(trader.wg)
 				delete(trader.Pairs[pair.Name], pair.Interval)
 				trader.log.Printf("DELETE: pair <%s> <%s> was deleted by <%s>",
 					pair.Name, pair.Interval, user.Username)
