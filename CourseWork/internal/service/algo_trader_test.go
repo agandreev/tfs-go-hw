@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/stretchr/testify/assert"
 	"io"
 	"sync"
 	"testing"
@@ -10,7 +11,6 @@ import (
 	mock_service "github.com/agandreev/tfs-go-hw/CourseWork/internal/service/mocks"
 	"github.com/golang/mock/gomock"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 )
 
 var trader = setupTrader()
@@ -23,7 +23,7 @@ func setupTrader() *AlgoTrader {
 		Orders:            nil,
 		API:               NewKrakenAPI(),
 		MessageWriters:    *NewMessageWriters(log),
-		WG:                &sync.WaitGroup{},
+		wg:                &sync.WaitGroup{},
 		reconnectionTimes: 1,
 		muPairs:           &sync.Mutex{},
 		signals:           make(chan domain.StockMarketEvent),
@@ -122,7 +122,11 @@ func TestAlgoTrader_AddUser(t *testing.T) {
 			trader.Users = repo
 
 			// Assert
-			assert.Equal(t, trader.AddUser(test.inputUser), test.expectedValue)
+			if test.expectedValue == nil {
+				assert.Equal(t, trader.AddUser(test.inputUser), test.expectedValue)
+			} else {
+				assert.Error(t, trader.AddUser(test.inputUser))
+			}
 		})
 	}
 }
